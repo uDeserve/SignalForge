@@ -4,6 +4,13 @@ import { randomUUID } from 'node:crypto';
 import { createStore } from './store.js';
 import { createSubmission, createCase, CaseStatus, PublicationTarget } from '../../../packages/core/src/index.js';
 import { triageSubmission } from '../../../packages/triage/src/index.js';
+import {
+  applyDecisionToCase,
+  buildPublicationSnapshot,
+  createDecisionRecord,
+  createIssuePublication,
+  parseOwnerCommand,
+} from '../../../packages/github-bridge/src/index.js';
 
 export function createSignalForgeApi({ store = createStore(), logger = console } = {}) {
   function createCaseRecordFromSubmission(submission) {
@@ -84,6 +91,77 @@ export function createSignalForgeApi({ store = createStore(), logger = console }
 
       if (method === 'GET' && url === '/cases') {
         return { statusCode: 200, body: { items: store.listCases() } };
+      }
+
+      if (method === 'POST' && url?.startsWith('/cases/') && url.endsWith('/publish')) {
+        const id = url.split('/')[2];
+        const caseRecord = store.getCase(id);
+        if (!caseRecord) {
+          return { statusCode: 404, error: { code: 'not_found', message: 'case not found' } };
+        }
+        if (!caseRecord.decisionReadiness?.actionable || caseRecord.publication?.target === PublicationTarget.none) {
+          return { statusCode: 422, error: { code: 'unprocessable', message: 'case is not ready for publication' } };
+        }
+        const payload = body?.target ?? {};
+        const publication = createIssuePublication(caseRecord, {
+          repo: payload.repo ?? caseRecord.decisionReadiness?.suggestedRepo ?? 'org/repo',
+          mode: payload.mode ?? PublicationTarget.github_issue,
+          externalId: `issue_${caseRecord.id}`,
+          url: `https://github.com/${payload.repo ?? caseRecord.decisionReadiness?.suggestedRepo ?? 'org/repo'}/issues/1`,
+          number: 1,
+        });
+        const stored = store.savePublication({
+          ...publication,
+          snapshot: buildPublicationSnapshot(caseRecord, { publicRepo: true }),
+        });
+        const nextCase = {
+          ...caseRecord,
+          status: CaseStatus.published,
+          publication: {
+            ...caseRecord.publication,
+            published: true,
+            target: publication.target.mode,
+            primaryPublicationId: stored.id,
+          },
+          updatedAt: new Date().toISOString(),
+        };
+        store.upsertCase(nextCase, nextCase.clustering.fingerprint);
+        return { statusCode: 201, body: { publicationId: stored.id, caseId: caseRecord.id, result: stored.result } };
+      }
+
+      if (method === 'POST' && url?.startsWith('/cases/') && url.endsWith('/decisions')) {
+        const id = url.split('/')[2];
+        const caseRecord = store.getCase(id);
+        if (!caseRecord) {
+          return { statusCode: 404, error: { code: 'not_found', message: 'case not found' } };
+        }
+        const decisionInput = body ?? {};
+        const decision = decisionInput.decision ?? parseOwnerCommand(decisionInput.commentBody)?.decision;
+        if (!decision) {
+          return { statusCode: 422, error: { code: 'unprocessable', message: 'decision is required' } };
+        }
+        const parsed = parseOwnerCommand(decisionInput.commentBody ?? '');
+        const record = createDecisionRecord(caseRecord.id, {
+          actorId: decisionInput.actor?.id ?? 'github:owner',
+          actorType: decisionInput.actor?.type ?? 'owner',
+          decision,
+          reason: decisionInput.reason ?? '',
+          payload: decisionInput.payload ?? parsed?.payload ?? {},
+        });
+        store.saveDecision(record);
+        const nextCase = applyDecisionToCase(caseRecord, record);
+        store.upsertCase(nextCase, nextCase.clustering.fingerprint);
+        return { statusCode: 201, body: { decisionId: record.id, caseId: caseRecord.id, statusAfterDecision: nextCase.status } };
+      }
+
+      if (method === 'GET' && url?.startsWith('/cases/') && url.endsWith('/publications')) {
+        const id = url.split('/')[2];
+        return { statusCode: 200, body: { items: store.listPublications(id) } };
+      }
+
+      if (method === 'GET' && url?.startsWith('/cases/') && url.endsWith('/decisions')) {
+        const id = url.split('/')[2];
+        return { statusCode: 200, body: { items: store.listDecisions(id) } };
       }
 
       if (method === 'GET' && url?.startsWith('/cases/')) {

@@ -47,6 +47,26 @@ export function createStore(dbPath = process.env.SIGNALFORGE_DB_PATH || defaultD
       metadata_json TEXT NOT NULL,
       fingerprint TEXT NOT NULL UNIQUE
     );
+
+    CREATE TABLE IF NOT EXISTS publications (
+      id TEXT PRIMARY KEY,
+      case_id TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      target_json TEXT NOT NULL,
+      result_json TEXT NOT NULL,
+      snapshot_json TEXT NOT NULL,
+      sync_json TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS decisions (
+      id TEXT PRIMARY KEY,
+      case_id TEXT NOT NULL,
+      made_at TEXT NOT NULL,
+      actor_json TEXT NOT NULL,
+      decision TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      payload_json TEXT NOT NULL
+    );
   `);
 
   return {
@@ -122,6 +142,48 @@ export function createStore(dbPath = process.env.SIGNALFORGE_DB_PATH || defaultD
       const row = db.prepare(`SELECT * FROM cases WHERE id = ?`).get(id);
       return row ? hydrateCase(row) : null;
     },
+    savePublication(publication) {
+      db.prepare(`
+        INSERT INTO publications (
+          id, case_id, created_at, target_json, result_json, snapshot_json, sync_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        publication.id,
+        publication.caseId,
+        publication.createdAt,
+        JSON.stringify(publication.target ?? {}),
+        JSON.stringify(publication.result ?? {}),
+        JSON.stringify(publication.snapshot ?? {}),
+        JSON.stringify(publication.sync ?? {}),
+      );
+      return publication;
+    },
+    listPublications(caseId) {
+      return db.prepare(`SELECT * FROM publications WHERE case_id = ? ORDER BY created_at DESC`).all(caseId).map(hydratePublication);
+    },
+    getPublication(id) {
+      const row = db.prepare(`SELECT * FROM publications WHERE id = ?`).get(id);
+      return row ? hydratePublication(row) : null;
+    },
+    saveDecision(decision) {
+      db.prepare(`
+        INSERT INTO decisions (
+          id, case_id, made_at, actor_json, decision, reason, payload_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        decision.id,
+        decision.caseId,
+        decision.madeAt,
+        JSON.stringify(decision.actor ?? {}),
+        decision.decision,
+        decision.reason ?? '',
+        JSON.stringify(decision.payload ?? {}),
+      );
+      return decision;
+    },
+    listDecisions(caseId) {
+      return db.prepare(`SELECT * FROM decisions WHERE case_id = ? ORDER BY made_at DESC`).all(caseId).map(hydrateDecision);
+    },
   };
 }
 
@@ -161,4 +223,28 @@ function hydrateCase(row) {
 function getCaseByFingerprint(db, fingerprint) {
   const row = db.prepare(`SELECT * FROM cases WHERE fingerprint = ?`).get(fingerprint);
   return row ? hydrateCase(row) : null;
+}
+
+function hydratePublication(row) {
+  return {
+    id: row.id,
+    caseId: row.case_id,
+    createdAt: row.created_at,
+    target: JSON.parse(row.target_json),
+    result: JSON.parse(row.result_json),
+    snapshot: JSON.parse(row.snapshot_json),
+    sync: JSON.parse(row.sync_json),
+  };
+}
+
+function hydrateDecision(row) {
+  return {
+    id: row.id,
+    caseId: row.case_id,
+    madeAt: row.made_at,
+    actor: JSON.parse(row.actor_json),
+    decision: row.decision,
+    reason: row.reason,
+    payload: JSON.parse(row.payload_json),
+  };
 }
