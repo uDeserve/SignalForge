@@ -60,46 +60,61 @@ export const DelegationStatus = Object.freeze({
   cancelled: 'cancelled',
 });
 
-export const FeedbackCase = {
-  create(input) {
-    return {
-      id: input.id,
-      createdAt: input.createdAt,
-      updatedAt: input.updatedAt,
-      status: input.status ?? CaseStatus.new,
-      canonicalTitle: input.canonicalTitle ?? '',
-      canonicalSummary: input.canonicalSummary ?? '',
-      classification: input.classification ?? {
-        primaryType: CaseType.noise,
-        confidence: 0,
-      },
-      scoring: input.scoring ?? {
-        actionabilityScore: 0,
-        severityScore: 0,
-        duplicateConfidence: 0,
-        publishRecommendation: PublicationTarget.none,
-      },
-      clustering: input.clustering ?? {
-        mergedSubmissionIds: [],
-        relatedCaseIds: [],
-      },
-      evidenceSummary: input.evidenceSummary ?? {
-        submissionCount: 0,
-      },
-      decisionReadiness: input.decisionReadiness ?? {
-        actionable: false,
-        missingInfo: [],
-      },
-      publication: input.publication ?? {
-        target: PublicationTarget.none,
-        published: false,
-      },
-      links: input.links ?? {
-        submissionIds: [],
-      },
-      metadata: input.metadata ?? {},
-    };
-  },
-};
+export function createCase(input = {}) {
+  return {
+    id: input.id,
+    createdAt: input.createdAt,
+    updatedAt: input.updatedAt,
+    status: input.status ?? CaseStatus.new,
+    canonicalTitle: input.canonicalTitle ?? '',
+    canonicalSummary: input.canonicalSummary ?? '',
+    classification: input.classification ?? {
+      primaryType: CaseType.noise,
+      confidence: 0,
+    },
+    scoring: input.scoring ?? {
+      actionabilityScore: 0,
+      severityScore: 0,
+      duplicateConfidence: 0,
+      publishRecommendation: PublicationTarget.none,
+    },
+    clustering: input.clustering ?? {
+      mergedSubmissionIds: [],
+      relatedCaseIds: [],
+    },
+    evidenceSummary: input.evidenceSummary ?? {
+      submissionCount: 0,
+    },
+    decisionReadiness: input.decisionReadiness ?? {
+      actionable: false,
+      missingInfo: [],
+    },
+    publication: input.publication ?? {
+      target: PublicationTarget.none,
+      published: false,
+    },
+    links: input.links ?? {
+      submissionIds: [],
+    },
+    metadata: input.metadata ?? {},
+  };
+}
+
+export function createSubmission(input = {}) {
+  return {
+    id: input.id,
+    source: input.source ?? SubmissionSources.manual_import,
+    submittedAt: input.submittedAt,
+    reporter: input.reporter ?? {},
+    appContext: input.appContext ?? {},
+    content: input.content ?? {},
+    evidence: input.evidence ?? {},
+    privacy: input.privacy ?? {
+      containsPii: false,
+      redactionStatus: 'pending',
+    },
+    raw: input.raw ?? {},
+  };
+}
 
 export const signalforgeCore = true;

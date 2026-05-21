@@ -4,12 +4,16 @@
   "version": "0.1.0",
   "description": "GitHub-native feedback triage and case publication layer",
   "license": "MIT",
-  "packageManager": "pnpm",
+  "packageManager": "npm@10.9.7",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "turbo run dev",
-    "build": "turbo run build",
-    "lint": "turbo run lint",
-    "test": "turbo run test",
-    "typecheck": "turbo run typecheck"
+    "dev": "node apps/api/src/index.js",
+    "build": "node -e \"console.log('build placeholder')\"",
+    "lint": "node -e \"console.log('lint placeholder')\"",
+    "test": "node --test",
+    "typecheck": "node -e \"console.log('typecheck placeholder')\""
   }
 }
