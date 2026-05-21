@@ -1,0 +1,13 @@
+{
+  "name": "@signalforge/api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node src/index.js",
+    "build": "node -e \"console.log('api build placeholder')\"",
+    "lint": "node -e \"console.log('api lint placeholder')\"",
+    "test": "node -e \"console.log('api test placeholder')\"",
+    "typecheck": "node -e \"console.log('api typecheck placeholder')\""
+  }
+}

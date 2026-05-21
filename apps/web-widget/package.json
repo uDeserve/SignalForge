@@ -1,0 +1,13 @@
+{
+  "name": "@signalforge/web-widget",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node src/index.js",
+    "build": "node -e \"console.log('web-widget build placeholder')\"",
+    "lint": "node -e \"console.log('web-widget lint placeholder')\"",
+    "test": "node -e \"console.log('web-widget test placeholder')\"",
+    "typecheck": "node -e \"console.log('web-widget typecheck placeholder')\""
+  }
+}

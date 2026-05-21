@@ -1,0 +1,15 @@
+{
+  "name": "signalforge",
+  "private": true,
+  "version": "0.1.0",
+  "description": "GitHub-native feedback triage and case publication layer",
+  "license": "MIT",
+  "packageManager": "pnpm",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck"
+  }
+}

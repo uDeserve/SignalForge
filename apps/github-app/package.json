@@ -1,0 +1,13 @@
+{
+  "name": "@signalforge/github-app",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node src/index.js",
+    "build": "node -e \"console.log('github-app build placeholder')\"",
+    "lint": "node -e \"console.log('github-app lint placeholder')\"",
+    "test": "node -e \"console.log('github-app test placeholder')\"",
+    "typecheck": "node -e \"console.log('github-app typecheck placeholder')\""
+  }
+}
