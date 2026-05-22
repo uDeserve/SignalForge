@@ -1,8 +1,17 @@
 export const SubmissionSources = Object.freeze({
+  adapter: 'adapter',
   web_widget: 'web_widget',
   mobile_sdk: 'mobile_sdk',
   email: 'email',
   chat: 'chat',
+  manual_import: 'manual_import',
+});
+
+export const RuntimeEventSources = Object.freeze({
+  adapter: 'adapter',
+  sentry: 'sentry',
+  glitchtip: 'glitchtip',
+  generic_webhook: 'generic_webhook',
   manual_import: 'manual_import',
 });
 
@@ -93,6 +102,7 @@ export function createCase(input = {}) {
       target: PublicationTarget.none,
       published: false,
     },
+    delegations: input.delegations ?? [],
     links: input.links ?? {
       submissionIds: [],
     },
@@ -113,6 +123,22 @@ export function createSubmission(input = {}) {
       containsPii: false,
       redactionStatus: 'pending',
     },
+    raw: input.raw ?? {},
+  };
+}
+
+export function createRuntimeEvent(input = {}) {
+  return {
+    id: input.id,
+    source: input.source ?? RuntimeEventSources.generic_webhook,
+    occurredAt: input.occurredAt,
+    environment: input.environment ?? 'unknown',
+    release: input.release ?? '',
+    route: input.route ?? '',
+    fingerprint: input.fingerprint ?? '',
+    error: input.error ?? {},
+    tags: input.tags ?? {},
+    context: input.context ?? {},
     raw: input.raw ?? {},
   };
 }

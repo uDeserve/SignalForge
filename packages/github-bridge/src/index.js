@@ -8,6 +8,14 @@ function normalizeLabel(label) {
   return String(label ?? '').trim().toLowerCase();
 }
 
+function sanitizeText(value) {
+  return String(value ?? '')
+    .replace(/https?:\/\/\S+/gi, '[redacted-url]')
+    .replace(/\b[\w.+-]+@[\w.-]+\.\w+\b/g, '[redacted-email]')
+    .replace(/\b\d{6,}\b/g, '[redacted-number]')
+    .trim();
+}
+
 export function buildIssueTitle(caseRecord) {
   return caseRecord?.canonicalTitle?.trim() || 'SignalForge case';
 }
@@ -15,7 +23,7 @@ export function buildIssueTitle(caseRecord) {
 export function buildIssueBody(caseRecord, { publicRepo = true } = {}) {
   const lines = [];
   lines.push('## Summary');
-  lines.push(caseRecord?.canonicalSummary?.trim() || 'No summary provided.');
+  lines.push(publicRepo ? sanitizeText(caseRecord?.canonicalSummary) || 'No summary provided.' : caseRecord?.canonicalSummary?.trim() || 'No summary provided.');
   lines.push('');
   lines.push('## Impact');
   lines.push(`Type: ${caseRecord?.classification?.primaryType ?? 'unknown'}`);
@@ -23,8 +31,12 @@ export function buildIssueBody(caseRecord, { publicRepo = true } = {}) {
   lines.push('');
   lines.push('## Evidence');
   lines.push(`Submissions: ${caseRecord?.evidenceSummary?.submissionCount ?? 0}`);
+  lines.push(`Runtime events: ${caseRecord?.evidenceSummary?.runtimeEventCount ?? 0}`);
   if (caseRecord?.evidenceSummary?.topErrorFingerprints?.length) {
     lines.push(`Error fingerprints: ${caseRecord.evidenceSummary.topErrorFingerprints.join(', ')}`);
+  }
+  if (caseRecord?.evidenceSummary?.environments?.length) {
+    lines.push(`Environments: ${caseRecord.evidenceSummary.environments.join(', ')}`);
   }
   lines.push('');
   lines.push('## Platform Metadata');
@@ -35,6 +47,11 @@ export function buildIssueBody(caseRecord, { publicRepo = true } = {}) {
     lines.push('');
     lines.push('## Internal Notes');
     lines.push(`Missing info: ${caseRecord.decisionReadiness.missingInfo.join(', ')}`);
+  }
+  if (publicRepo) {
+    lines.push('');
+    lines.push('## Privacy');
+    lines.push('Sensitive raw logs, screenshots, URLs, and direct user identifiers are intentionally omitted.');
   }
   return lines.join('\n');
 }
@@ -159,5 +176,15 @@ export function createDecisionRecord(caseId, { actorId = 'owner', actorType = 'o
     decision,
     reason,
     payload,
+  };
+}
+
+export function buildCaseContext(caseRecord, extras = {}) {
+  return {
+    case: caseRecord,
+    decisions: extras.decisions ?? [],
+    delegations: extras.delegations ?? [],
+    publications: extras.publications ?? [],
+    runtimeEvents: extras.runtimeEvents ?? [],
   };
 }

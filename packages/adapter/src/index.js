@@ -38,6 +38,99 @@ export async function submitFeedback({ endpoint, input, fetchImpl = fetch }) {
   return response.json();
 }
 
+export function createSignalForgeContext({
+  appName = 'app',
+  environment = 'development',
+  release = '',
+  route = '',
+  userId = '',
+  sessionId = '',
+  extra = {},
+} = {}) {
+  return stripUndefined({
+    appName,
+    environment,
+    release,
+    route,
+    userId,
+    sessionId,
+    ...extra,
+  });
+}
+
+export function createRuntimeEvent(input = {}) {
+  return {
+    source: input.source ?? 'adapter',
+    occurredAt: input.occurredAt ?? new Date().toISOString(),
+    environment: input.environment ?? 'unknown',
+    release: input.release ?? '',
+    route: input.route ?? '',
+    fingerprint: input.fingerprint ?? '',
+    error: input.error ?? {},
+    tags: input.tags ?? {},
+    context: input.context ?? {},
+    raw: input.raw ?? {},
+  };
+}
+
+export function captureError(error, context = {}) {
+  return createRuntimeEvent({
+    source: 'adapter',
+    environment: context.environment ?? 'unknown',
+    release: context.release ?? '',
+    route: context.route ?? '',
+    fingerprint: context.fingerprint ?? '',
+    error: {
+      type: error?.name ?? 'Error',
+      message: error?.message ?? String(error),
+      stack: error?.stack ?? '',
+    },
+    tags: context.tags ?? {},
+    context,
+    raw: {
+      name: error?.name,
+      message: error?.message,
+      stack: error?.stack,
+    },
+  });
+}
+
+export function linkSentry(event, context = {}) {
+  return createRuntimeEvent({
+    source: 'sentry',
+    occurredAt: event?.timestamp ?? new Date().toISOString(),
+    environment: event?.environment ?? context.environment ?? 'unknown',
+    release: event?.release ?? context.release ?? '',
+    route: event?.request?.url ?? event?.transaction ?? context.route ?? '',
+    fingerprint: Array.isArray(event?.fingerprint) ? event.fingerprint.join('|') : event?.fingerprint ?? '',
+    error: {
+      type: event?.exception?.values?.[0]?.type ?? event?.level ?? 'Error',
+      message: event?.exception?.values?.[0]?.value ?? event?.message ?? 'Runtime failure detected.',
+    },
+    tags: event?.tags ?? {},
+    context,
+    raw: event ?? {},
+  });
+}
+
+export function linkGlitchTip(event, context = {}) {
+  return createRuntimeEvent({
+    source: 'glitchtip',
+    occurredAt: event?.timestamp ?? new Date().toISOString(),
+    environment: event?.environment ?? context.environment ?? 'unknown',
+    release: event?.release ?? context.release ?? '',
+    route: event?.request?.url ?? event?.transaction ?? context.route ?? '',
+    fingerprint: Array.isArray(event?.fingerprint) ? event.fingerprint.join('|') : event?.fingerprint ?? '',
+    error: {
+      type: event?.exception?.values?.[0]?.type ?? event?.level ?? 'Error',
+      message: event?.exception?.values?.[0]?.value ?? event?.message ?? 'Runtime failure detected.',
+    },
+    tags: event?.tags ?? {},
+    context,
+    raw: event ?? {},
+  });
+}
+
 export function mountFeedbackWidget(root, { endpoint, fetchImpl = fetch, context = {}, onSubmit } = {}) {
   if (!root) throw new Error('root element is required');
 
@@ -80,99 +173,6 @@ export function mountFeedbackWidget(root, { endpoint, fetchImpl = fetch, context
   root.innerHTML = '';
   root.appendChild(wrapper);
   return wrapper;
-}
-
-export function createSignalForgeContext({
-  appName = 'app',
-  environment = 'development',
-  release = '',
-  route = '',
-  userId = '',
-  sessionId = '',
-  extra = {},
-} = {}) {
-  return stripUndefined({
-    appName,
-    environment,
-    release,
-    route,
-    userId,
-    sessionId,
-    ...extra,
-  });
-}
-
-export function createRuntimeEvent(input = {}) {
-  return {
-    source: input.source ?? 'adapter',
-    occurredAt: input.occurredAt ?? new Date().toISOString(),
-    environment: input.environment ?? 'unknown',
-    release: input.release ?? '',
-    route: input.route ?? '',
-    fingerprint: input.fingerprint ?? '',
-    error: input.error ?? {},
-    tags: input.tags ?? {},
-    context: input.context ?? {},
-    raw: input.raw ?? {},
-  };
-}
-
-export function linkSentry(event, context = {}) {
-  return createRuntimeEvent({
-    source: 'sentry',
-    occurredAt: event?.timestamp ?? new Date().toISOString(),
-    environment: event?.environment ?? context.environment ?? 'unknown',
-    release: event?.release ?? context.release ?? '',
-    route: event?.request?.url ?? event?.transaction ?? context.route ?? '',
-    fingerprint: Array.isArray(event?.fingerprint) ? event.fingerprint.join('|') : event?.fingerprint ?? '',
-    error: {
-      type: event?.exception?.values?.[0]?.type ?? event?.level ?? 'Error',
-      message: event?.exception?.values?.[0]?.value ?? event?.message ?? 'Runtime failure detected.',
-    },
-    tags: event?.tags ?? {},
-    context,
-    raw: event ?? {},
-  });
-}
-
-export function linkGlitchTip(event, context = {}) {
-  return createRuntimeEvent({
-    source: 'glitchtip',
-    occurredAt: event?.timestamp ?? new Date().toISOString(),
-    environment: event?.environment ?? context.environment ?? 'unknown',
-    release: event?.release ?? context.release ?? '',
-    route: event?.request?.url ?? event?.transaction ?? context.route ?? '',
-    fingerprint: Array.isArray(event?.fingerprint) ? event.fingerprint.join('|') : event?.fingerprint ?? '',
-    error: {
-      type: event?.exception?.values?.[0]?.type ?? event?.level ?? 'Error',
-      message: event?.exception?.values?.[0]?.value ?? event?.message ?? 'Runtime failure detected.',
-    },
-    tags: event?.tags ?? {},
-    context,
-    raw: event ?? {},
-  });
-}
-
-export function captureError(error, context = {}) {
-  return createRuntimeEvent({
-    source: 'adapter',
-    environment: context.environment ?? 'unknown',
-    release: context.release ?? '',
-    route: context.route ?? '',
-    fingerprint: context.fingerprint ?? '',
-    error: {
-      type: error?.name ?? 'Error',
-      message: error?.message ?? String(error),
-      stack: error?.stack ?? '',
-    },
-    tags: context.tags ?? {},
-    context,
-    raw: {
-      name: error?.name,
-      message: error?.message,
-      stack: error?.stack,
-    },
-  });
 }
 
 export function installSignalForge({
@@ -242,4 +242,8 @@ export function wrapErrorBoundary({ onError, capture } = {}) {
       }
     };
   };
+}
+
+export function createSignalForgeAdapter(options = {}) {
+  return installSignalForge(options);
 }

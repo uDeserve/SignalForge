@@ -6,7 +6,7 @@
   "scripts": {
     "build": "node -e \"console.log('mcp-server build placeholder')\"",
     "lint": "node -e \"console.log('mcp-server lint placeholder')\"",
-    "test": "node -e \"console.log('mcp-server test placeholder')\"",
+    "test": "node --test",
     "typecheck": "node -e \"console.log('mcp-server typecheck placeholder')\""
   }
 }

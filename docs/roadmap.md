@@ -27,3 +27,9 @@
 - agent delegation bridge
 - runtime signal integration
 - privacy hardening
+
+Current progress:
+
+- agent delegation bridge: in progress
+- runtime signal integration: in progress
+- privacy hardening: baseline implemented for public GitHub publication

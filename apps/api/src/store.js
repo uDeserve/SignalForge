@@ -30,6 +30,20 @@ export function createStore(dbPath = process.env.SIGNALFORGE_DB_PATH || defaultD
       raw_json TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS runtime_events (
+      id TEXT PRIMARY KEY,
+      source TEXT NOT NULL,
+      occurred_at TEXT NOT NULL,
+      environment TEXT NOT NULL,
+      release TEXT NOT NULL,
+      route TEXT NOT NULL,
+      fingerprint TEXT NOT NULL,
+      error_json TEXT NOT NULL,
+      tags_json TEXT NOT NULL,
+      context_json TEXT NOT NULL,
+      raw_json TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS cases (
       id TEXT PRIMARY KEY,
       created_at TEXT NOT NULL,
@@ -67,6 +81,18 @@ export function createStore(dbPath = process.env.SIGNALFORGE_DB_PATH || defaultD
       reason TEXT NOT NULL,
       payload_json TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS delegations (
+      id TEXT PRIMARY KEY,
+      case_id TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      status TEXT NOT NULL,
+      target_json TEXT NOT NULL,
+      request_json TEXT NOT NULL,
+      result_json TEXT NOT NULL
+    );
   `);
 
   return {
@@ -96,26 +122,87 @@ export function createStore(dbPath = process.env.SIGNALFORGE_DB_PATH || defaultD
       const row = db.prepare(`SELECT * FROM submissions WHERE id = ?`).get(id);
       return row ? hydrateSubmission(row) : null;
     },
+    saveRuntimeEvent(event) {
+      db.prepare(`
+        INSERT INTO runtime_events (
+          id, source, occurred_at, environment, release, route, fingerprint,
+          error_json, tags_json, context_json, raw_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        event.id,
+        event.source,
+        event.occurredAt,
+        event.environment,
+        event.release ?? '',
+        event.route ?? '',
+        event.fingerprint ?? '',
+        JSON.stringify(event.error ?? {}),
+        JSON.stringify(event.tags ?? {}),
+        JSON.stringify(event.context ?? {}),
+        JSON.stringify(event.raw ?? {}),
+      );
+      return event;
+    },
+    getRuntimeEvent(id) {
+      const row = db.prepare(`SELECT * FROM runtime_events WHERE id = ?`).get(id);
+      return row ? hydrateRuntimeEvent(row) : null;
+    },
+    listRuntimeEventsByFingerprint(fingerprint) {
+      return db.prepare(`SELECT * FROM runtime_events WHERE fingerprint = ? ORDER BY occurred_at DESC`).all(fingerprint).map(hydrateRuntimeEvent);
+    },
+    listRuntimeEventsByIds(ids = []) {
+      if (!ids.length) return [];
+      const statement = db.prepare(`SELECT * FROM runtime_events WHERE id = ?`);
+      return ids.map((id) => statement.get(id)).filter(Boolean).map(hydrateRuntimeEvent);
+    },
     upsertCase(caseRecord, fingerprint) {
+      const resolvedFingerprint = fingerprint ?? caseRecord?.clustering?.fingerprint ?? caseRecord?.id;
+      const existing = getCaseById(db, caseRecord?.id) ?? getCaseByFingerprint(db, resolvedFingerprint);
+      const targetId = existing?.id ?? caseRecord.id;
+      const targetFingerprint = existing ? existing.clustering?.fingerprint ?? resolvedFingerprint : resolvedFingerprint;
+      if (existing) {
+        db.prepare(`
+          UPDATE cases
+          SET created_at = ?,
+              updated_at = ?,
+              status = ?,
+              canonical_title = ?,
+              canonical_summary = ?,
+              classification_json = ?,
+              scoring_json = ?,
+              clustering_json = ?,
+              evidence_summary_json = ?,
+              decision_readiness_json = ?,
+              publication_json = ?,
+              links_json = ?,
+              metadata_json = ?,
+              fingerprint = ?
+          WHERE id = ?
+        `).run(
+          caseRecord.createdAt,
+          caseRecord.updatedAt,
+          caseRecord.status,
+          caseRecord.canonicalTitle,
+          caseRecord.canonicalSummary,
+          JSON.stringify(caseRecord.classification ?? {}),
+          JSON.stringify(caseRecord.scoring ?? {}),
+          JSON.stringify(caseRecord.clustering ?? {}),
+          JSON.stringify(caseRecord.evidenceSummary ?? {}),
+          JSON.stringify(caseRecord.decisionReadiness ?? {}),
+          JSON.stringify(caseRecord.publication ?? {}),
+          JSON.stringify(caseRecord.links ?? {}),
+          JSON.stringify(caseRecord.metadata ?? {}),
+          targetFingerprint,
+          targetId,
+        );
+        return getCaseById(db, targetId);
+      }
       db.prepare(`
         INSERT INTO cases (
           id, created_at, updated_at, status, canonical_title, canonical_summary,
           classification_json, scoring_json, clustering_json, evidence_summary_json,
           decision_readiness_json, publication_json, links_json, metadata_json, fingerprint
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(fingerprint) DO UPDATE SET
-          updated_at = excluded.updated_at,
-          status = excluded.status,
-          canonical_title = excluded.canonical_title,
-          canonical_summary = excluded.canonical_summary,
-          classification_json = excluded.classification_json,
-          scoring_json = excluded.scoring_json,
-          clustering_json = excluded.clustering_json,
-          evidence_summary_json = excluded.evidence_summary_json,
-          decision_readiness_json = excluded.decision_readiness_json,
-          publication_json = excluded.publication_json,
-          links_json = excluded.links_json,
-          metadata_json = excluded.metadata_json
       `).run(
         caseRecord.id,
         caseRecord.createdAt,
@@ -131,9 +218,9 @@ export function createStore(dbPath = process.env.SIGNALFORGE_DB_PATH || defaultD
         JSON.stringify(caseRecord.publication ?? {}),
         JSON.stringify(caseRecord.links ?? {}),
         JSON.stringify(caseRecord.metadata ?? {}),
-        fingerprint,
+        resolvedFingerprint,
       );
-      return getCaseByFingerprint(db, fingerprint);
+      return getCaseByFingerprint(db, resolvedFingerprint);
     },
     listCases() {
       return db.prepare(`SELECT * FROM cases ORDER BY updated_at DESC`).all().map(hydrateCase);
@@ -159,11 +246,36 @@ export function createStore(dbPath = process.env.SIGNALFORGE_DB_PATH || defaultD
       return publication;
     },
     listPublications(caseId) {
-      return db.prepare(`SELECT * FROM publications WHERE case_id = ? ORDER BY created_at DESC`).all(caseId).map(hydratePublication);
+      const rows = caseId
+        ? db.prepare(`SELECT * FROM publications WHERE case_id = ? ORDER BY created_at DESC`).all(caseId)
+        : db.prepare(`SELECT * FROM publications ORDER BY created_at DESC`).all();
+      return rows.map(hydratePublication);
     },
     getPublication(id) {
       const row = db.prepare(`SELECT * FROM publications WHERE id = ?`).get(id);
       return row ? hydratePublication(row) : null;
+    },
+    findPublicationByIssue({ repo, number }) {
+      const targetRepo = String(repo ?? '').trim();
+      const targetNumber = Number(number);
+      if (!targetRepo || !Number.isFinite(targetNumber)) return null;
+      return this.listPublications().find((publication) => {
+        return publication.target?.repo === targetRepo && Number(publication.result?.number) === targetNumber;
+      }) ?? null;
+    },
+    updatePublicationSync(id, syncPatch = {}) {
+      const current = this.getPublication(id);
+      if (!current) return null;
+      const nextSync = {
+        ...(current.sync ?? {}),
+        ...syncPatch,
+      };
+      db.prepare(`
+        UPDATE publications
+        SET sync_json = ?
+        WHERE id = ?
+      `).run(JSON.stringify(nextSync), id);
+      return this.getPublication(id);
     },
     saveDecision(decision) {
       db.prepare(`
@@ -184,6 +296,31 @@ export function createStore(dbPath = process.env.SIGNALFORGE_DB_PATH || defaultD
     listDecisions(caseId) {
       return db.prepare(`SELECT * FROM decisions WHERE case_id = ? ORDER BY made_at DESC`).all(caseId).map(hydrateDecision);
     },
+    saveDelegation(delegation) {
+      db.prepare(`
+        INSERT INTO delegations (
+          id, case_id, created_at, updated_at, kind, status, target_json, request_json, result_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        delegation.id,
+        delegation.caseId,
+        delegation.createdAt,
+        delegation.updatedAt,
+        delegation.kind,
+        delegation.status,
+        JSON.stringify(delegation.target ?? {}),
+        JSON.stringify(delegation.request ?? {}),
+        JSON.stringify(delegation.result ?? {}),
+      );
+      return delegation;
+    },
+    listDelegations(caseId) {
+      return db.prepare(`SELECT * FROM delegations WHERE case_id = ? ORDER BY created_at DESC`).all(caseId).map(hydrateDelegation);
+    },
+    getDelegation(id) {
+      const row = db.prepare(`SELECT * FROM delegations WHERE id = ?`).get(id);
+      return row ? hydrateDelegation(row) : null;
+    },
   };
 }
 
@@ -197,6 +334,22 @@ function hydrateSubmission(row) {
     content: JSON.parse(row.content_json),
     evidence: JSON.parse(row.evidence_json),
     privacy: JSON.parse(row.privacy_json),
+    raw: JSON.parse(row.raw_json),
+  };
+}
+
+function hydrateRuntimeEvent(row) {
+  return {
+    id: row.id,
+    source: row.source,
+    occurredAt: row.occurred_at,
+    environment: row.environment,
+    release: row.release,
+    route: row.route,
+    fingerprint: row.fingerprint,
+    error: JSON.parse(row.error_json),
+    tags: JSON.parse(row.tags_json),
+    context: JSON.parse(row.context_json),
     raw: JSON.parse(row.raw_json),
   };
 }
@@ -215,6 +368,7 @@ function hydrateCase(row) {
     evidenceSummary: JSON.parse(row.evidence_summary_json),
     decisionReadiness: JSON.parse(row.decision_readiness_json),
     publication: JSON.parse(row.publication_json),
+    delegations: [],
     links: JSON.parse(row.links_json),
     metadata: JSON.parse(row.metadata_json),
   };
@@ -222,6 +376,11 @@ function hydrateCase(row) {
 
 function getCaseByFingerprint(db, fingerprint) {
   const row = db.prepare(`SELECT * FROM cases WHERE fingerprint = ?`).get(fingerprint);
+  return row ? hydrateCase(row) : null;
+}
+
+function getCaseById(db, id) {
+  const row = db.prepare(`SELECT * FROM cases WHERE id = ?`).get(id);
   return row ? hydrateCase(row) : null;
 }
 
@@ -246,5 +405,19 @@ function hydrateDecision(row) {
     decision: row.decision,
     reason: row.reason,
     payload: JSON.parse(row.payload_json),
+  };
+}
+
+function hydrateDelegation(row) {
+  return {
+    id: row.id,
+    caseId: row.case_id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    kind: row.kind,
+    status: row.status,
+    target: JSON.parse(row.target_json),
+    request: JSON.parse(row.request_json),
+    result: JSON.parse(row.result_json),
   };
 }

@@ -4,7 +4,7 @@ High level flow:
 
 ```text
 User / Product Surface
--> Widget or SDK
+-> SignalForge Adapter / Widget / Runtime Provider
 -> Intake API
 -> Triage Engine
 -> FeedbackCase Store
@@ -15,3 +15,15 @@ User / Product Surface
 ```
 
 The platform should keep raw intake, canonical cases, GitHub publication, and execution separate.
+
+Agent and MCP integrations should consume case context through the platform boundary, not by treating GitHub as the source of truth.
+
+Runtime collection should preferably come from mature providers such as Sentry or GlitchTip.
+
+SignalForge should own:
+
+- event normalization
+- case correlation
+- GitHub publication
+- owner decision capture
+- agent delegation

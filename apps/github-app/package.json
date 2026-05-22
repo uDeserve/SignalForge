@@ -7,7 +7,7 @@
     "dev": "node src/index.js",
     "build": "node -e \"console.log('github-app build placeholder')\"",
     "lint": "node -e \"console.log('github-app lint placeholder')\"",
-    "test": "node -e \"console.log('github-app test placeholder')\"",
+    "test": "node --test",
     "typecheck": "node -e \"console.log('github-app typecheck placeholder')\""
   }
 }

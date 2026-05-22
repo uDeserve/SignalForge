@@ -17,6 +17,16 @@ function fingerprintSubmission(submission) {
   return [title, body.slice(0, 120), route, primaryError].filter(Boolean).join('|');
 }
 
+function fingerprintRuntimeEvent(event) {
+  const fingerprint = normalizeText(event?.fingerprint);
+  if (fingerprint) return fingerprint;
+  const route = normalizeText(event?.route);
+  const errorType = normalizeText(event?.error?.type);
+  const errorMessage = normalizeText(event?.error?.message);
+  const release = normalizeText(event?.release);
+  return [route, errorType, errorMessage.slice(0, 120), release].filter(Boolean).join('|');
+}
+
 function classifySubmission(submission) {
   const body = normalizeText(submission?.content?.body);
   const title = normalizeText(submission?.content?.title);
@@ -91,5 +101,31 @@ export function triageSubmission(submission) {
       submission?.content?.title?.trim() ||
       (classification.primaryType === CaseType.bug ? 'Bug report' : 'User feedback'),
     canonicalSummary: submission?.content?.body?.trim() || '',
+  };
+}
+
+export function triageRuntimeEvent(event) {
+  const errorType = normalizeText(event?.error?.type);
+  const errorMessage = normalizeText(event?.error?.message);
+  const fingerprint = fingerprintRuntimeEvent(event);
+  const text = `${errorType} ${errorMessage} ${normalizeText(event?.route)}`;
+  const classification = /(error|exception|timeout|crash|fail|500|429|hang)/.test(text)
+    ? { primaryType: CaseType.bug, confidence: 0.92 }
+    : { primaryType: CaseType.noise, confidence: 0.25 };
+  const severityScore = /(timeout|crash|500|cannot|unhandled|fatal)/.test(text) ? 0.82 : 0.45;
+  const actionable = classification.primaryType === CaseType.bug;
+
+  return {
+    fingerprint,
+    classification,
+    scoring: {
+      actionabilityScore: actionable ? 0.9 : 0.2,
+      severityScore,
+      duplicateConfidence: 0.4,
+      publishRecommendation: actionable ? PublicationTarget.github_issue : PublicationTarget.none,
+    },
+    actionable,
+    canonicalTitle: event?.error?.type?.trim() || 'Runtime error',
+    canonicalSummary: event?.error?.message?.trim() || 'Runtime failure detected.',
   };
 }

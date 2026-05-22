@@ -1,0 +1,12 @@
+{
+  "name": "@signalforge/adapter",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "node -e \"console.log('adapter build placeholder')\"",
+    "lint": "node -e \"console.log('adapter lint placeholder')\"",
+    "test": "node --test",
+    "typecheck": "node -e \"console.log('adapter typecheck placeholder')\""
+  }
+}
