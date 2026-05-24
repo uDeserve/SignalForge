@@ -2,7 +2,7 @@
 
 GitHub-native feedback triage and case publication layer.
 
-SignalForge turns end-user feedback and runtime signals into structured engineering cases, then bridges actionable cases into GitHub and agent-driven execution workflows.
+SignalForge turns end-user feedback and runtime signals into structured engineering cases, then bridges those cases into GitHub and agent-driven execution workflows.
 
 ## What This Is
 
@@ -25,10 +25,10 @@ SignalForge turns end-user feedback and runtime signals into structured engineer
 ```text
 user feedback / runtime error
 -> submission
--> triage
+-> llm-assisted triage
 -> FeedbackCase
--> GitHub publication
--> maintainer decision
+-> automatic GitHub publication
+-> maintainer execution decision
 -> agent or skill delegation
 ```
 
@@ -79,6 +79,35 @@ await sf.captureError(new Error('reader timeout'));
 - MCP bridge for case listing, context fetch, and delegation
 - adapter-first easy start for web projects
 
+## Product Principle
+
+SignalForge should optimize for one maintainer decision, not two.
+
+That means:
+
+- SignalForge may publish a GitHub issue automatically after triage
+- the owner does not need to approve issue creation first
+- the owner makes the real decision at execution time:
+  - accept
+  - reject
+  - defer
+  - ask for more context
+
+In this model, a GitHub issue is a decision surface, not an automatic commitment to engineering work.
+
+## LLM Role
+
+The LLM should not be treated as the final decision-maker for product changes.
+
+Its first job is:
+
+- merge similar raw feedback
+- filter low-value noise and support-like content
+- translate user language into engineering language
+- produce decision-ready case summaries
+
+The owner still decides whether a published issue should enter the execution loop.
+
 ## Runtime Signals
 
 SignalForge does not try to replace mature exception monitoring tools.
@@ -100,3 +129,28 @@ This keeps SignalForge focused on the engineering loop instead of low-level SDK 
 - `docs/mvp.md`
 - `docs/architecture.md`
 - `docs/roadmap.md`
+- `docs/llm-triage.md`
+- `docs/readerapp-e2e-sample.md`
+
+## LLM Setup
+
+SignalForge can run in two modes:
+
+- heuristic fallback only
+- DeepSeek-backed LLM triage
+
+Set these env vars to enable DeepSeek:
+
+```bash
+DEEPSEEK_API_KEY=...
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_MODEL=deepseek-v4-flash
+```
+
+If no key is configured, SignalForge continues using heuristic triage.
+
+For local startup with a repo-level `.env`, run:
+
+```bash
+node scripts/start_api_with_env.mjs
+```

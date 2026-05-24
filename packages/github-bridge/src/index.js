@@ -21,6 +21,7 @@ export function buildIssueTitle(caseRecord) {
 }
 
 export function buildIssueBody(caseRecord, { publicRepo = true } = {}) {
+  const triage = caseRecord?.metadata?.triage ?? {};
   const lines = [];
   lines.push('## Summary');
   lines.push(publicRepo ? sanitizeText(caseRecord?.canonicalSummary) || 'No summary provided.' : caseRecord?.canonicalSummary?.trim() || 'No summary provided.');
@@ -28,21 +29,43 @@ export function buildIssueBody(caseRecord, { publicRepo = true } = {}) {
   lines.push('## Impact');
   lines.push(`Type: ${caseRecord?.classification?.primaryType ?? 'unknown'}`);
   lines.push(`Severity: ${caseRecord?.classification?.severity ?? 'unknown'}`);
+  if (triage?.confidence !== undefined) {
+    lines.push(`Confidence: ${triage.confidence}`);
+  }
+  if (triage?.suggestedNextAction) {
+    lines.push(`Suggested next action: ${triage.suggestedNextAction}`);
+  }
   lines.push('');
   lines.push('## Evidence');
   lines.push(`Submissions: ${caseRecord?.evidenceSummary?.submissionCount ?? 0}`);
   lines.push(`Runtime events: ${caseRecord?.evidenceSummary?.runtimeEventCount ?? 0}`);
+  if (triage?.clusterSizeEstimate) {
+    lines.push(`Cluster size: ${triage.clusterSizeEstimate}`);
+  }
   if (caseRecord?.evidenceSummary?.topErrorFingerprints?.length) {
     lines.push(`Error fingerprints: ${caseRecord.evidenceSummary.topErrorFingerprints.join(', ')}`);
   }
   if (caseRecord?.evidenceSummary?.environments?.length) {
     lines.push(`Environments: ${caseRecord.evidenceSummary.environments.join(', ')}`);
   }
+  if (triage?.affectedSurface) {
+    lines.push(`Affected surface: ${publicRepo ? sanitizeText(triage.affectedSurface) : triage.affectedSurface}`);
+  }
   lines.push('');
   lines.push('## Platform Metadata');
   lines.push(`Case ID: ${caseRecord?.id ?? 'unknown'}`);
   lines.push(`Status: ${caseRecord?.status ?? 'unknown'}`);
   lines.push(`Publication target: ${caseRecord?.publication?.target ?? 'unknown'}`);
+  if (triage?.triageMode) {
+    lines.push(`Triage mode: ${triage.triageMode}`);
+  }
+  if (triage?.openQuestions?.length) {
+    lines.push('');
+    lines.push('## Open Questions');
+    for (const question of triage.openQuestions) {
+      lines.push(`- ${publicRepo ? sanitizeText(question) : question}`);
+    }
+  }
   if (!publicRepo && caseRecord?.decisionReadiness?.missingInfo?.length) {
     lines.push('');
     lines.push('## Internal Notes');
@@ -57,13 +80,14 @@ export function buildIssueBody(caseRecord, { publicRepo = true } = {}) {
 }
 
 export function selectGitHubLabels(caseRecord) {
-  const labels = new Set([
-    'source:user-feedback',
-  ]);
+  const labels = new Set(caseRecord?.decisionReadiness?.suggestedLabels ?? caseRecord?.metadata?.triage?.suggestedLabels ?? []);
   const primaryType = caseRecord?.classification?.primaryType;
   if (primaryType) labels.add(`type:${normalizeLabel(primaryType).replace(/_/g, '-')}`);
   const priority = caseRecord?.decisionReadiness?.suggestedPriority;
   if (priority) labels.add(`priority:${normalizeLabel(priority)}`);
+  if (!labels.size) {
+    labels.add(caseRecord?.metadata?.sourceKind === 'runtime_signal' ? 'source:runtime-signal' : 'source:user-feedback');
+  }
   return [...labels];
 }
 

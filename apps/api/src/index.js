@@ -3,7 +3,8 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { createStore } from './store.js';
 import { createSubmission, createCase, createRuntimeEvent, CaseStatus, PublicationTarget, RuntimeEventSources } from '../../../packages/core/src/index.js';
-import { triageSubmission, triageRuntimeEvent } from '../../../packages/triage/src/index.js';
+import { createTriageEngine, triageRuntimeEvent } from '../../../packages/triage/src/index.js';
+import { createDeepSeekSubmissionAnalyzer } from '../../../packages/triage/src/deepseek.js';
 import {
   applyDecisionToCase,
   buildCaseContext,
@@ -14,9 +15,15 @@ import {
 } from '../../../packages/github-bridge/src/index.js';
 import { DelegationKind, DelegationStatus } from '../../../packages/core/src/index.js';
 
-export function createSignalForgeApi({ store = createStore(), logger = console } = {}) {
-  function createCaseRecordFromSubmission(submission) {
-    const triaged = triageSubmission(submission);
+export function createSignalForgeApi({ store = createStore(), logger = console, triageEngine = createTriageEngine({ logger }) } = {}) {
+  async function createCaseRecordFromSubmission(submission) {
+    const triaged = await triageEngine.triageSubmission(submission, {
+      requestId: `triage_${submission.id}`,
+      policy: {
+        publishBias: 'lenient',
+        privacyMode: 'strict',
+      },
+    });
     const now = new Date().toISOString();
     return createCase({
       id: `case_${randomUUID()}`,
@@ -40,7 +47,7 @@ export function createSignalForgeApi({ store = createStore(), logger = console }
         actionable: triaged.actionable,
         missingInfo: [],
         suggestedRepo: 'org/repo',
-        suggestedLabels: ['source:user-feedback'],
+        suggestedLabels: triaged.semantic?.suggestedLabels ?? ['source:user-feedback'],
         suggestedPriority: triaged.scoring.severityScore >= 0.8 ? 'p1' : 'p2',
         suggestedOwner: 'owner',
       },
@@ -51,11 +58,21 @@ export function createSignalForgeApi({ store = createStore(), logger = console }
       links: {
         submissionIds: [submission.id],
       },
+      metadata: {
+        triage: triaged.semantic ?? null,
+        sourceKind: 'user_feedback',
+      },
     });
   }
 
-  function createCaseRecordFromRuntimeEvent(event) {
-    const triaged = triageRuntimeEvent(event);
+  async function createCaseRecordFromRuntimeEvent(event) {
+    const triaged = await triageEngine.triageRuntimeEvent(event, {
+      requestId: `triage_${event.id}`,
+      policy: {
+        publishBias: 'lenient',
+        privacyMode: 'strict',
+      },
+    });
     const now = new Date().toISOString();
     return createCase({
       id: `case_${randomUUID()}`,
@@ -83,7 +100,7 @@ export function createSignalForgeApi({ store = createStore(), logger = console }
         actionable: triaged.actionable,
         missingInfo: [],
         suggestedRepo: 'org/repo',
-        suggestedLabels: ['source:runtime-signal'],
+        suggestedLabels: triaged.semantic?.suggestedLabels ?? ['source:runtime-signal'],
         suggestedPriority: triaged.scoring.severityScore >= 0.8 ? 'p1' : 'p2',
         suggestedOwner: 'owner',
       },
@@ -96,6 +113,8 @@ export function createSignalForgeApi({ store = createStore(), logger = console }
         runtimeEventIds: [event.id],
       },
       metadata: {
+        triage: triaged.semantic ?? null,
+        sourceKind: 'runtime_signal',
         runtimeSummary: {
           environments: [event.environment].filter(Boolean),
           releases: [event.release].filter(Boolean),
@@ -188,7 +207,7 @@ export function createSignalForgeApi({ store = createStore(), logger = console }
         for (const submissionId of submissionIds) {
           const submission = store.getSubmission(submissionId);
           if (!submission) continue;
-          const caseRecord = createCaseRecordFromSubmission(submission);
+          const caseRecord = await createCaseRecordFromSubmission(submission);
           const storedCase = store.upsertCase(caseRecord, caseRecord.clustering.fingerprint);
           caseIds.push(storedCase.id);
           created += storedCase.id === caseRecord.id ? 1 : 0;
@@ -215,7 +234,7 @@ export function createSignalForgeApi({ store = createStore(), logger = console }
         const existingCase = fingerprint ? store.listCases().find((item) => item.clustering?.fingerprint === fingerprint) : null;
         const storedCase = existingCase
           ? store.upsertCase(enrichCaseWithRuntimeEvent(existingCase, event), existingCase.clustering.fingerprint)
-          : store.upsertCase(createCaseRecordFromRuntimeEvent(event), fingerprint);
+          : store.upsertCase(await createCaseRecordFromRuntimeEvent(event), fingerprint);
         return { statusCode: 201, body: { runtimeEventId: event.id, caseId: storedCase.id } };
       }
 
@@ -436,9 +455,23 @@ export function createSignalForgeApi({ store = createStore(), logger = console }
 
 function main() {
   const port = Number(process.env.PORT || 8787);
-  const { server } = createSignalForgeApi();
+  const deepSeekApiKey = process.env.DEEPSEEK_API_KEY || '';
+  const deepSeekBaseUrl = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com';
+  const deepSeekModel = process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash';
+  const triageEngine = deepSeekApiKey
+    ? createTriageEngine({
+        logger: console,
+        submissionAnalyzer: createDeepSeekSubmissionAnalyzer({
+          apiKey: deepSeekApiKey,
+          baseUrl: deepSeekBaseUrl,
+          model: deepSeekModel,
+        }),
+      })
+    : createTriageEngine({ logger: console });
+  const { server } = createSignalForgeApi({ triageEngine, logger: console });
   server.listen(port, () => {
     console.log(`SignalForge API listening on http://localhost:${port}`);
+    console.log(`SignalForge triage mode: ${deepSeekApiKey ? `llm (${deepSeekModel})` : 'heuristic fallback'}`);
   });
 }
 
