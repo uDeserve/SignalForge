@@ -8,14 +8,19 @@ import { createDeepSeekSubmissionAnalyzer } from '../../../packages/triage/src/d
 import {
   applyDecisionToCase,
   buildCaseContext,
-  buildPublicationSnapshot,
+  createPreviewGitHubPublisher,
   createDecisionRecord,
   createIssuePublication,
   parseOwnerCommand,
 } from '../../../packages/github-bridge/src/index.js';
 import { DelegationKind, DelegationStatus } from '../../../packages/core/src/index.js';
 
-export function createSignalForgeApi({ store = createStore(), logger = console, triageEngine = createTriageEngine({ logger }) } = {}) {
+export function createSignalForgeApi({
+  store = createStore(),
+  logger = console,
+  triageEngine = createTriageEngine({ logger }),
+  githubPublisher = createPreviewGitHubPublisher(),
+} = {}) {
   async function createCaseRecordFromSubmission(submission) {
     const triaged = await triageEngine.triageSubmission(submission, {
       requestId: `triage_${submission.id}`,
@@ -307,16 +312,22 @@ export function createSignalForgeApi({ store = createStore(), logger = console, 
           return { statusCode: 422, error: { code: 'unprocessable', message: 'case is not ready for publication' } };
         }
         const payload = body?.target ?? {};
-        const publication = createIssuePublication(caseRecord, {
+        const published = await githubPublisher.publishCase({
+          caseRecord,
           repo: payload.repo ?? caseRecord.decisionReadiness?.suggestedRepo ?? 'org/repo',
           mode: payload.mode ?? PublicationTarget.github_issue,
-          externalId: `issue_${caseRecord.id}`,
-          url: `https://github.com/${payload.repo ?? caseRecord.decisionReadiness?.suggestedRepo ?? 'org/repo'}/issues/1`,
-          number: 1,
+          publicRepo: payload.publicRepo ?? true,
+        });
+        const publication = createIssuePublication(caseRecord, {
+          repo: published.repo,
+          mode: published.mode,
+          externalId: published.result.externalId,
+          url: published.result.url,
+          number: published.result.number,
         });
         const stored = store.savePublication({
           ...publication,
-          snapshot: buildPublicationSnapshot(caseRecord, { publicRepo: true }),
+          snapshot: published.snapshot,
         });
         const nextCase = {
           ...caseRecord,

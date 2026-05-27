@@ -79,6 +79,18 @@ await sf.captureError(new Error('reader timeout'));
 - MCP bridge for case listing, context fetch, and delegation
 - adapter-first easy start for web projects
 
+## GitHub Publication Modes
+
+SignalForge currently supports a staged GitHub publication strategy:
+
+- `preview`: local issue-like publication for flow validation
+- `pat`: real GitHub issue creation through a repository token
+- `app`: reserved for the final GitHub App implementation
+
+The API flow should stay the same across these modes.
+
+Only the publisher implementation should change.
+
 ## Product Principle
 
 SignalForge should optimize for one maintainer decision, not two.
@@ -154,3 +166,13 @@ For local startup with a repo-level `.env`, run:
 ```bash
 node scripts/start_api_with_env.mjs
 ```
+
+GitHub publisher env:
+
+```bash
+GITHUB_PUBLISHER=preview
+GITHUB_TOKEN=
+GITHUB_API_BASE_URL=https://api.github.com
+```
+
+Use `GITHUB_PUBLISHER=pat` together with `GITHUB_TOKEN` when you want `/cases/:id/publish` to create a real GitHub issue.

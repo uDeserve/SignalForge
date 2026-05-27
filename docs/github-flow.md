@@ -2,6 +2,49 @@
 
 GitHub is the collaboration and publication surface for SignalForge.
 
+## Auth Strategy
+
+SignalForge should support two GitHub publication phases:
+
+1. `PAT` or token-backed publication for local validation and first-project rollout
+2. `GitHub App` publication for reusable, multi-repo, installable production usage
+
+The product goal is the GitHub App path.
+
+The development goal is not to block early validation on GitHub App setup.
+
+That means:
+
+- the case-to-issue contract should be validated first
+- the publisher implementation should be swappable
+- the API and case flow should not depend on whether auth comes from a PAT or an installation token
+
+## Publisher Contract
+
+SignalForge should treat GitHub publication as a transport boundary.
+
+The publisher interface should accept:
+
+- case record
+- target repo
+- publication mode
+- public or private repo rendering hint
+
+The publisher should return:
+
+- normalized repo target
+- issue snapshot used for publication
+- GitHub external identifiers like issue id, issue number, and URL
+
+Today this allows:
+
+- `preview` publisher for local-only issue-like publication
+- `pat` publisher for real GitHub issue creation
+
+Later this should allow:
+
+- `app` publisher backed by GitHub App installation tokens
+
 The GitHub App bridge is responsible for:
 
 - creating issues or discussions

@@ -54,6 +54,26 @@ Agent and MCP integrations should consume case context through the platform boun
 
 Runtime collection should preferably come from mature providers such as Sentry or GlitchTip.
 
+## GitHub Publisher Boundary
+
+SignalForge should not hardcode a single GitHub auth mode into the API layer.
+
+The API should depend on a publisher boundary such as `githubPublisher.publishCase(...)`.
+
+This lets the same case publication flow support:
+
+- local preview mode
+- PAT-backed issue creation
+- GitHub App-backed issue creation
+
+The important architectural rule is:
+
+- case normalization stays in SignalForge
+- issue rendering stays in SignalForge
+- GitHub auth and transport stay behind the publisher boundary
+
+This keeps the eventual GitHub App migration additive instead of a rewrite.
+
 SignalForge should own:
 
 - event normalization

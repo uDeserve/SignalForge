@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import { createSignalForgeApi } from '../apps/api/src/index.js';
 import { createTriageEngine } from '../packages/triage/src/index.js';
 import { createDeepSeekSubmissionAnalyzer } from '../packages/triage/src/deepseek.js';
+import { createGitHubPublisherFromEnv } from '../packages/github-bridge/src/index.js';
 
 function loadEnv(filePath) {
   if (!fs.existsSync(filePath)) return;
@@ -30,11 +31,13 @@ const triageEngine = process.env.DEEPSEEK_API_KEY
       }),
     })
   : createTriageEngine({ logger: console });
-const { server } = createSignalForgeApi({ triageEngine, logger: console });
+const githubPublisher = createGitHubPublisherFromEnv(process.env);
+const { server } = createSignalForgeApi({ triageEngine, logger: console, githubPublisher });
 
 server.listen(port, () => {
   console.log(`SignalForge API listening on http://127.0.0.1:${port}`);
   console.log(
     `SignalForge triage mode: ${process.env.DEEPSEEK_API_KEY ? process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash' : 'heuristic fallback'}`
   );
+  console.log(`SignalForge GitHub publisher: ${githubPublisher.kind}`);
 });

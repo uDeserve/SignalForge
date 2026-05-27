@@ -5,7 +5,12 @@ import { createStore } from '../src/store.js';
 import { createSubmission, createRuntimeEvent } from '../../../packages/core/src/index.js';
 import { createTriageEngine, triageSubmission, triageRuntimeEvent, validateTriageResult } from '../../../packages/triage/src/index.js';
 import { createDeepSeekSubmissionAnalyzer } from '../../../packages/triage/src/deepseek.js';
-import { buildIssueBody, parseOwnerCommand } from '../../../packages/github-bridge/src/index.js';
+import {
+  buildIssueBody,
+  createPatGitHubPublisher,
+  createPreviewGitHubPublisher,
+  parseOwnerCommand,
+} from '../../../packages/github-bridge/src/index.js';
 
 test('triage classifies obvious bug feedback as actionable', () => {
   const submission = createSubmission({
@@ -224,6 +229,124 @@ test('api publishes actionable cases and records decisions', async () => {
   const decisionList = await handleRequest({ method: 'GET', url: `/cases/${caseId}/decisions`, body: {} });
   assert.equal(decisionList.statusCode, 200);
   assert.equal(decisionList.body.items.length, 1);
+});
+
+test('api publish uses injected github publisher result', async () => {
+  const githubPublisher = {
+    async publishCase({ caseRecord, repo, mode }) {
+      return {
+        repo,
+        mode,
+        snapshot: {
+          title: caseRecord.canonicalTitle,
+          body: caseRecord.canonicalSummary,
+          labels: ['source:user-feedback'],
+          assignees: [],
+        },
+        result: {
+          externalId: 'gh_issue_123',
+          url: `https://github.com/${repo}/issues/99`,
+          number: 99,
+        },
+      };
+    },
+  };
+  const { handleRequest } = createSignalForgeApi({
+    store: createStore(':memory:'),
+    logger: { error() {} },
+    githubPublisher,
+  });
+
+  const submissionResponse = await handleRequest({
+    method: 'POST',
+    url: '/submissions',
+    body: {
+      source: 'web_widget',
+      content: { title: 'Save freezes', body: 'The page hangs on save and returns 500.' },
+      evidence: { runtimeErrors: [{ message: 'timeout' }] },
+    },
+  });
+  const submissionId = submissionResponse.body.submissionId;
+  await handleRequest({ method: 'POST', url: '/triage/run', body: { submissionIds: [submissionId] } });
+  const casesResponse = await handleRequest({ method: 'GET', url: '/cases', body: {} });
+  const caseId = casesResponse.body.items[0].id;
+
+  const publishResponse = await handleRequest({
+    method: 'POST',
+    url: `/cases/${caseId}/publish`,
+    body: { target: { repo: 'uDeserve/SignalForge', mode: 'github_issue' } },
+  });
+
+  assert.equal(publishResponse.statusCode, 201);
+  assert.equal(publishResponse.body.result.externalId, 'gh_issue_123');
+  assert.equal(publishResponse.body.result.number, 99);
+});
+
+test('github preview publisher returns issue-like publication result', async () => {
+  const publisher = createPreviewGitHubPublisher();
+  const published = await publisher.publishCase({
+    caseRecord: {
+      id: 'case_preview_1',
+      canonicalTitle: 'Preview issue',
+      canonicalSummary: 'Preview body',
+      decisionReadiness: { suggestedLabels: ['source:user-feedback'] },
+      classification: { primaryType: 'bug', severity: 'medium' },
+      evidenceSummary: { submissionCount: 1 },
+      publication: { target: 'github_issue' },
+      status: 'ready_for_publish',
+      metadata: {},
+    },
+    repo: 'uDeserve/SignalForge',
+    mode: 'github_issue',
+  });
+  assert.equal(published.repo, 'uDeserve/SignalForge');
+  assert.equal(published.result.number, 1);
+  assert.match(published.result.url, /github\.com\/uDeserve\/SignalForge\/issues\/1/);
+});
+
+test('github pat publisher creates issue through github api contract', async () => {
+  let request;
+  const publisher = createPatGitHubPublisher({
+    token: 'test_token',
+    apiBaseUrl: 'https://api.github.test',
+    fetchImpl: async (url, init) => {
+      request = { url, init };
+      return {
+        ok: true,
+        async json() {
+          return {
+            id: 12345,
+            number: 7,
+            html_url: 'https://github.com/uDeserve/SignalForge/issues/7',
+          };
+        },
+      };
+    },
+  });
+
+  const published = await publisher.publishCase({
+    caseRecord: {
+      id: 'case_pat_1',
+      canonicalTitle: 'PAT issue',
+      canonicalSummary: 'PAT body',
+      decisionReadiness: { suggestedLabels: ['source:user-feedback'] },
+      classification: { primaryType: 'bug', severity: 'medium' },
+      evidenceSummary: { submissionCount: 1 },
+      publication: { target: 'github_issue' },
+      status: 'ready_for_publish',
+      metadata: {},
+    },
+    repo: 'uDeserve/SignalForge',
+    mode: 'github_issue',
+  });
+
+  assert.equal(request.url, 'https://api.github.test/repos/uDeserve/SignalForge/issues');
+  assert.equal(request.init.method, 'POST');
+  assert.match(request.init.headers.Authorization, /Bearer test_token/);
+  const payload = JSON.parse(request.init.body);
+  assert.deepEqual(payload.assignees, []);
+  assert.equal(published.result.number, 7);
+  assert.equal(published.result.externalId, '12345');
 });
 
 test('api rejects publication for non-actionable cases', async () => {

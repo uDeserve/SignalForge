@@ -16,6 +16,13 @@ function sanitizeText(value) {
     .trim();
 }
 
+function isValidGitHubAssignee(value) {
+  const text = String(value ?? '').trim();
+  if (!text) return false;
+  if (text === 'owner') return false;
+  return /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,37})$/.test(text);
+}
+
 export function buildIssueTitle(caseRecord) {
   return caseRecord?.canonicalTitle?.trim() || 'SignalForge case';
 }
@@ -161,7 +168,9 @@ export function buildPublicationSnapshot(caseRecord, { publicRepo = true } = {})
     title: buildIssueTitle(caseRecord),
     body: buildIssueBody(caseRecord, { publicRepo }),
     labels: selectGitHubLabels(caseRecord),
-    assignees: caseRecord?.decisionReadiness?.suggestedOwner ? [caseRecord.decisionReadiness.suggestedOwner] : [],
+    assignees: isValidGitHubAssignee(caseRecord?.decisionReadiness?.suggestedOwner)
+      ? [caseRecord.decisionReadiness.suggestedOwner]
+      : [],
   };
 }
 
@@ -211,4 +220,124 @@ export function buildCaseContext(caseRecord, extras = {}) {
     publications: extras.publications ?? [],
     runtimeEvents: extras.runtimeEvents ?? [],
   };
+}
+
+export function parseGitHubRepo(input, fallback = 'org/repo') {
+  const value = String(input ?? fallback).trim();
+  const match = value.match(/^([^/\s]+)\/([^/\s]+)$/);
+  if (!match) {
+    throw new Error(`invalid github repo: ${value}`);
+  }
+  return {
+    owner: match[1],
+    repo: match[2],
+    fullName: `${match[1]}/${match[2]}`,
+  };
+}
+
+export function createPreviewGitHubPublisher() {
+  return {
+    kind: 'preview',
+    async publishCase({ caseRecord, repo, mode = PublicationTarget.github_issue, publicRepo = true }) {
+      const resolvedRepo = parseGitHubRepo(repo);
+      return {
+        repo: resolvedRepo.fullName,
+        mode,
+        snapshot: buildPublicationSnapshot(caseRecord, { publicRepo }),
+        result: {
+          externalId: `preview_issue_${caseRecord.id}`,
+          url: `https://github.com/${resolvedRepo.fullName}/issues/1`,
+          number: 1,
+        },
+        transport: {
+          provider: 'github',
+          authMode: 'preview',
+        },
+      };
+    },
+  };
+}
+
+export function createPatGitHubPublisher({
+  token,
+  apiBaseUrl = 'https://api.github.com',
+  fetchImpl = globalThis.fetch,
+  userAgent = 'SignalForge/0.1.0',
+} = {}) {
+  if (!token) {
+    throw new Error('github token is required for PAT publisher');
+  }
+  if (typeof fetchImpl !== 'function') {
+    throw new Error('fetch implementation is required for PAT publisher');
+  }
+
+  const normalizedBaseUrl = String(apiBaseUrl).replace(/\/$/, '');
+
+  return {
+    kind: 'pat',
+    async publishCase({ caseRecord, repo, mode = PublicationTarget.github_issue, publicRepo = true }) {
+      if (mode !== PublicationTarget.github_issue) {
+        throw new Error(`unsupported github publication mode: ${mode}`);
+      }
+
+      const resolvedRepo = parseGitHubRepo(repo);
+      const snapshot = buildPublicationSnapshot(caseRecord, { publicRepo });
+      const response = await fetchImpl(
+        `${normalizedBaseUrl}/repos/${resolvedRepo.owner}/${resolvedRepo.repo}/issues`,
+        {
+          method: 'POST',
+          headers: {
+            Accept: 'application/vnd.github+json',
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'User-Agent': userAgent,
+          },
+          body: JSON.stringify({
+            title: snapshot.title,
+            body: snapshot.body,
+            labels: snapshot.labels,
+            assignees: snapshot.assignees,
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        const message = await response.text().catch(() => '');
+        throw new Error(`github issue publish failed: ${response.status} ${message}`.trim());
+      }
+
+      const issue = await response.json();
+      return {
+        repo: resolvedRepo.fullName,
+        mode,
+        snapshot,
+        result: {
+          externalId: String(issue.id),
+          url: issue.html_url,
+          number: issue.number,
+        },
+        transport: {
+          provider: 'github',
+          authMode: 'pat',
+        },
+      };
+    },
+  };
+}
+
+export function createGitHubPublisherFromEnv(env = process.env) {
+  const publisherMode = String(env.GITHUB_PUBLISHER ?? 'preview').trim().toLowerCase();
+  if (publisherMode === 'preview') {
+    return createPreviewGitHubPublisher();
+  }
+  if (publisherMode === 'pat') {
+    return createPatGitHubPublisher({
+      token: env.GITHUB_TOKEN,
+      apiBaseUrl: env.GITHUB_API_BASE_URL || 'https://api.github.com',
+    });
+  }
+  if (publisherMode === 'app') {
+    throw new Error('github app publisher is not implemented yet');
+  }
+  throw new Error(`unsupported github publisher mode: ${publisherMode}`);
 }
