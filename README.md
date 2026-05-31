@@ -85,7 +85,8 @@ SignalForge currently supports a staged GitHub publication strategy:
 
 - `preview`: local issue-like publication for flow validation
 - `pat`: real GitHub issue creation through a repository token
-- `app`: reserved for the final GitHub App implementation
+- `app`: GitHub App publisher boundary with installation-token-based skeleton
+  and JWT-based installation token exchange
 
 The API flow should stay the same across these modes.
 
@@ -143,6 +144,7 @@ This keeps SignalForge focused on the engineering loop instead of low-level SDK 
 - `docs/roadmap.md`
 - `docs/llm-triage.md`
 - `docs/readerapp-e2e-sample.md`
+- `docs/github-app-setup.md`
 
 ## LLM Setup
 
@@ -173,6 +175,21 @@ GitHub publisher env:
 GITHUB_PUBLISHER=preview
 GITHUB_TOKEN=
 GITHUB_API_BASE_URL=https://api.github.com
+GITHUB_APP_ID=
+GITHUB_APP_INSTALLATION_ID=
+GITHUB_APP_INSTALLATION_TOKEN=
+GITHUB_APP_PRIVATE_KEY=
 ```
 
 Use `GITHUB_PUBLISHER=pat` together with `GITHUB_TOKEN` when you want `/cases/:id/publish` to create a real GitHub issue.
+
+Use `GITHUB_PUBLISHER=app` when you want to exercise the GitHub App publisher boundary.
+
+`app` mode supports two variants:
+
+- static installation token via `GITHUB_APP_INSTALLATION_TOKEN`
+- real GitHub App auth via `GITHUB_APP_ID`, `GITHUB_APP_INSTALLATION_ID`, and `GITHUB_APP_PRIVATE_KEY`
+
+The static token path is useful for controlled testing.
+
+The JWT path is the intended production shape.

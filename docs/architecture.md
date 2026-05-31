@@ -66,6 +66,14 @@ This lets the same case publication flow support:
 - PAT-backed issue creation
 - GitHub App-backed issue creation
 
+The current GitHub App layer now supports:
+
+- installation token provider boundary
+- GitHub App JWT signing
+- installation token exchange
+
+It still keeps a static installation token mode for testing and controlled fallback.
+
 The important architectural rule is:
 
 - case normalization stays in SignalForge

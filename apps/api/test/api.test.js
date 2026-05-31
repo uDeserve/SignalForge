@@ -6,9 +6,14 @@ import { createSubmission, createRuntimeEvent } from '../../../packages/core/src
 import { createTriageEngine, triageSubmission, triageRuntimeEvent, validateTriageResult } from '../../../packages/triage/src/index.js';
 import { createDeepSeekSubmissionAnalyzer } from '../../../packages/triage/src/deepseek.js';
 import {
+  createGitHubAppJwt,
+  createGitHubAppPublisher,
+  createGitHubPublisherFromEnv,
+  createJwtGitHubAppInstallationTokenProvider,
   buildIssueBody,
   createPatGitHubPublisher,
   createPreviewGitHubPublisher,
+  createStaticGitHubAppInstallationTokenProvider,
   parseOwnerCommand,
 } from '../../../packages/github-bridge/src/index.js';
 
@@ -347,6 +352,139 @@ test('github pat publisher creates issue through github api contract', async () 
   assert.deepEqual(payload.assignees, []);
   assert.equal(published.result.number, 7);
   assert.equal(published.result.externalId, '12345');
+});
+
+test('github app publisher uses installation token provider contract', async () => {
+  let request;
+  const publisher = createGitHubAppPublisher({
+    appId: '123456',
+    installationTokenProvider: createStaticGitHubAppInstallationTokenProvider({
+      token: 'installation_token_1',
+      installationId: '999',
+    }),
+    apiBaseUrl: 'https://api.github.test',
+    fetchImpl: async (url, init) => {
+      request = { url, init };
+      return {
+        ok: true,
+        async json() {
+          return {
+            id: 777,
+            number: 11,
+            html_url: 'https://github.com/uDeserve/SignalForge/issues/11',
+          };
+        },
+      };
+    },
+  });
+
+  const published = await publisher.publishCase({
+    caseRecord: {
+      id: 'case_app_1',
+      canonicalTitle: 'App issue',
+      canonicalSummary: 'App body',
+      decisionReadiness: { suggestedLabels: ['source:user-feedback'] },
+      classification: { primaryType: 'bug', severity: 'medium' },
+      evidenceSummary: { submissionCount: 1 },
+      publication: { target: 'github_issue' },
+      status: 'ready_for_publish',
+      metadata: {},
+    },
+    repo: 'uDeserve/SignalForge',
+    mode: 'github_issue',
+  });
+
+  assert.equal(request.url, 'https://api.github.test/repos/uDeserve/SignalForge/issues');
+  assert.match(request.init.headers.Authorization, /Bearer installation_token_1/);
+  assert.equal(published.transport.authMode, 'app');
+  assert.equal(published.result.number, 11);
+});
+
+test('github app jwt creation returns a signed compact token', async () => {
+  const { privateKey } = await import('node:crypto').then(({ generateKeyPairSync }) =>
+    generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+    }),
+  );
+
+  const jwt = await createGitHubAppJwt({
+    appId: '123456',
+    privateKeyPem: privateKey,
+    now: 1_700_000_000,
+  });
+
+  const parts = jwt.split('.');
+  assert.equal(parts.length, 3);
+  const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+  assert.equal(payload.iss, '123456');
+});
+
+test('github app jwt creation also accepts pkcs1 rsa private keys', async () => {
+  const { privateKey } = await import('node:crypto').then(({ generateKeyPairSync }) =>
+    generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      privateKeyEncoding: { type: 'pkcs1', format: 'pem' },
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+    }),
+  );
+
+  const jwt = await createGitHubAppJwt({
+    appId: '123456',
+    privateKeyPem: privateKey,
+    now: 1_700_000_000,
+  });
+
+  assert.equal(jwt.split('.').length, 3);
+});
+
+test('jwt installation token provider exchanges app jwt for installation token', async () => {
+  const { privateKey } = await import('node:crypto').then(({ generateKeyPairSync }) =>
+    generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+    }),
+  );
+
+  let request;
+  const provider = createJwtGitHubAppInstallationTokenProvider({
+    appId: '123456',
+    privateKeyPem: privateKey,
+    installationId: '999',
+    apiBaseUrl: 'https://api.github.test',
+    fetchImpl: async (url, init) => {
+      request = { url, init };
+      return {
+        ok: true,
+        async json() {
+          return {
+            token: 'installation_token_from_exchange',
+            expires_at: '2026-05-28T12:00:00Z',
+          };
+        },
+      };
+    },
+  });
+
+  const installation = await provider.getInstallationToken();
+  assert.equal(request.url, 'https://api.github.test/app/installations/999/access_tokens');
+  assert.equal(request.init.method, 'POST');
+  assert.match(request.init.headers.Authorization, /^Bearer /);
+  assert.equal(installation.token, 'installation_token_from_exchange');
+});
+
+test('github publisher from env prefers jwt app provider when full app credentials are present', () => {
+  const publisher = createGitHubPublisherFromEnv({
+    GITHUB_PUBLISHER: 'app',
+    GITHUB_APP_ID: '123456',
+    GITHUB_APP_INSTALLATION_ID: '999',
+    GITHUB_APP_PRIVATE_KEY: '-----BEGIN PRIVATE KEY-----\nZmFrZQ==\n-----END PRIVATE KEY-----',
+    GITHUB_API_BASE_URL: 'https://api.github.test',
+  });
+
+  assert.equal(publisher.kind, 'app');
 });
 
 test('api rejects publication for non-actionable cases', async () => {

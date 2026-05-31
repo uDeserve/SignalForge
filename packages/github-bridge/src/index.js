@@ -325,6 +325,179 @@ export function createPatGitHubPublisher({
   };
 }
 
+async function publishIssueViaGithubApi({
+  token,
+  apiBaseUrl = 'https://api.github.com',
+  fetchImpl = globalThis.fetch,
+  userAgent = 'SignalForge/0.1.0',
+  caseRecord,
+  repo,
+  mode = PublicationTarget.github_issue,
+  publicRepo = true,
+  authMode = 'pat',
+}) {
+  if (!token) {
+    throw new Error(`github token is required for ${authMode} publisher`);
+  }
+  if (typeof fetchImpl !== 'function') {
+    throw new Error(`fetch implementation is required for ${authMode} publisher`);
+  }
+  if (mode !== PublicationTarget.github_issue) {
+    throw new Error(`unsupported github publication mode: ${mode}`);
+  }
+
+  const resolvedRepo = parseGitHubRepo(repo);
+  const snapshot = buildPublicationSnapshot(caseRecord, { publicRepo });
+  const normalizedBaseUrl = String(apiBaseUrl).replace(/\/$/, '');
+  const response = await fetchImpl(
+    `${normalizedBaseUrl}/repos/${resolvedRepo.owner}/${resolvedRepo.repo}/issues`,
+    {
+      method: 'POST',
+      headers: {
+        Accept: 'application/vnd.github+json',
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'User-Agent': userAgent,
+      },
+      body: JSON.stringify({
+        title: snapshot.title,
+        body: snapshot.body,
+        labels: snapshot.labels,
+        assignees: snapshot.assignees,
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    const message = await response.text().catch(() => '');
+    throw new Error(`github issue publish failed: ${response.status} ${message}`.trim());
+  }
+
+  const issue = await response.json();
+  return {
+    repo: resolvedRepo.fullName,
+    mode,
+    snapshot,
+    result: {
+      externalId: String(issue.id),
+      url: issue.html_url,
+      number: issue.number,
+    },
+    transport: {
+      provider: 'github',
+      authMode,
+    },
+  };
+}
+
+function base64UrlEncode(input) {
+  const source = typeof input === 'string' ? Buffer.from(input) : Buffer.from(input);
+  return source.toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+}
+
+async function importGithubAppPrivateKey(privateKeyPem) {
+  if (!privateKeyPem) {
+    throw new Error('github app private key is required');
+  }
+  const pem = String(privateKeyPem).trim();
+  const isPkcs1 = pem.includes('BEGIN RSA PRIVATE KEY');
+  const createKey = await import('node:crypto').then(({ createPrivateKey }) => createPrivateKey);
+  if (isPkcs1) {
+    return createKey({
+      key: pem,
+      format: 'pem',
+      type: 'pkcs1',
+    });
+  }
+  const body = pem
+    .replace('-----BEGIN PRIVATE KEY-----', '')
+    .replace('-----END PRIVATE KEY-----', '')
+    .replace(/\s+/g, '');
+  const keyData = Buffer.from(body, 'base64');
+  return createKey({
+    key: keyData,
+    format: 'der',
+    type: 'pkcs8',
+  });
+}
+
+export async function createGitHubAppJwt({
+  appId,
+  privateKeyPem,
+  now = Math.floor(Date.now() / 1000),
+} = {}) {
+  if (!appId) {
+    throw new Error('github app id is required');
+  }
+
+  const header = { alg: 'RS256', typ: 'JWT' };
+  const payload = {
+    iat: now - 60,
+    exp: now + 9 * 60,
+    iss: String(appId),
+  };
+  const signingInput = `${base64UrlEncode(JSON.stringify(header))}.${base64UrlEncode(JSON.stringify(payload))}`;
+  const cryptoKey = await importGithubAppPrivateKey(privateKeyPem);
+  const signature = await import('node:crypto').then(({ sign }) =>
+    sign('RSA-SHA256', Buffer.from(signingInput), cryptoKey),
+  );
+  return `${signingInput}.${base64UrlEncode(Buffer.from(signature))}`;
+}
+
+export function createJwtGitHubAppInstallationTokenProvider({
+  appId,
+  privateKeyPem,
+  installationId = '',
+  apiBaseUrl = 'https://api.github.com',
+  fetchImpl = globalThis.fetch,
+  userAgent = 'SignalForge/0.1.0',
+} = {}) {
+  if (!appId) {
+    throw new Error('github app id is required');
+  }
+  if (!privateKeyPem) {
+    throw new Error('github app private key is required');
+  }
+  if (!installationId) {
+    throw new Error('github app installation id is required');
+  }
+  if (typeof fetchImpl !== 'function') {
+    throw new Error('fetch implementation is required for github app installation token provider');
+  }
+
+  const normalizedBaseUrl = String(apiBaseUrl).replace(/\/$/, '');
+
+  return {
+    kind: 'jwt_installation_token',
+    async getInstallationToken() {
+      const jwt = await createGitHubAppJwt({ appId, privateKeyPem });
+      const response = await fetchImpl(
+        `${normalizedBaseUrl}/app/installations/${installationId}/access_tokens`,
+        {
+          method: 'POST',
+          headers: {
+            Accept: 'application/vnd.github+json',
+            Authorization: `Bearer ${jwt}`,
+            'User-Agent': userAgent,
+          },
+        },
+      );
+
+      if (!response.ok) {
+        const message = await response.text().catch(() => '');
+        throw new Error(`github app installation token exchange failed: ${response.status} ${message}`.trim());
+      }
+
+      const tokenResponse = await response.json();
+      return {
+        token: tokenResponse.token,
+        installationId: String(installationId),
+        expiresAt: tokenResponse.expires_at ?? '',
+      };
+    },
+  };
+}
+
 export function createGitHubPublisherFromEnv(env = process.env) {
   const publisherMode = String(env.GITHUB_PUBLISHER ?? 'preview').trim().toLowerCase();
   if (publisherMode === 'preview') {
@@ -337,7 +510,71 @@ export function createGitHubPublisherFromEnv(env = process.env) {
     });
   }
   if (publisherMode === 'app') {
-    throw new Error('github app publisher is not implemented yet');
+    const hasJwtInputs = Boolean(env.GITHUB_APP_ID && env.GITHUB_APP_PRIVATE_KEY && env.GITHUB_APP_INSTALLATION_ID);
+    return createGitHubAppPublisher({
+      installationTokenProvider: hasJwtInputs
+        ? createJwtGitHubAppInstallationTokenProvider({
+            appId: env.GITHUB_APP_ID,
+            privateKeyPem: env.GITHUB_APP_PRIVATE_KEY,
+            installationId: env.GITHUB_APP_INSTALLATION_ID,
+            apiBaseUrl: env.GITHUB_API_BASE_URL || 'https://api.github.com',
+          })
+        : createStaticGitHubAppInstallationTokenProvider({
+            token: env.GITHUB_APP_INSTALLATION_TOKEN,
+            installationId: env.GITHUB_APP_INSTALLATION_ID,
+          }),
+      apiBaseUrl: env.GITHUB_API_BASE_URL || 'https://api.github.com',
+      appId: env.GITHUB_APP_ID,
+    });
   }
   throw new Error(`unsupported github publisher mode: ${publisherMode}`);
+}
+
+export function createStaticGitHubAppInstallationTokenProvider({
+  token,
+  installationId = '',
+} = {}) {
+  return {
+    kind: 'static_installation_token',
+    async getInstallationToken() {
+      if (!token) {
+        throw new Error('github app installation token is required');
+      }
+      return {
+        token,
+        installationId: installationId ? String(installationId) : '',
+      };
+    },
+  };
+}
+
+export function createGitHubAppPublisher({
+  installationTokenProvider,
+  apiBaseUrl = 'https://api.github.com',
+  fetchImpl = globalThis.fetch,
+  userAgent = 'SignalForge/0.1.0',
+  appId = '',
+} = {}) {
+  if (!installationTokenProvider || typeof installationTokenProvider.getInstallationToken !== 'function') {
+    throw new Error('installationTokenProvider is required for github app publisher');
+  }
+
+  return {
+    kind: 'app',
+    appId: appId ? String(appId) : '',
+    async publishCase({ caseRecord, repo, mode = PublicationTarget.github_issue, publicRepo = true }) {
+      const installation = await installationTokenProvider.getInstallationToken({ repo, mode, caseRecord });
+      return publishIssueViaGithubApi({
+        token: installation?.token,
+        apiBaseUrl,
+        fetchImpl,
+        userAgent,
+        caseRecord,
+        repo,
+        mode,
+        publicRepo,
+        authMode: 'app',
+      });
+    },
+  };
 }

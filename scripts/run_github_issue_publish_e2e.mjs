@@ -121,6 +121,7 @@ if (publishResponse.error) {
 
 console.log(JSON.stringify({
   publisher: githubPublisher.kind,
+  publisherMode: process.env.GITHUB_PUBLISHER || 'preview',
   targetRepo,
   caseId: caseRecord.id,
   publishResult: publishResponse.body.result,

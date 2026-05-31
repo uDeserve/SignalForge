@@ -45,6 +45,21 @@ Later this should allow:
 
 - `app` publisher backed by GitHub App installation tokens
 
+## GitHub App Skeleton
+
+SignalForge now has an `app` publisher boundary.
+
+At the current stage it should be understood as:
+
+- the publication transport is already separated from the case flow
+- the publisher can already work with an installation token provider
+- the publisher now supports full GitHub App JWT signing and installation token exchange
+- a static installation token path still exists for controlled testing
+
+This is intentional.
+
+It keeps the system architecture stable while allowing early E2E flow validation with PAT mode.
+
 The GitHub App bridge is responsible for:
 
 - creating issues or discussions
