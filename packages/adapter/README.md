@@ -16,7 +16,8 @@ into SignalForge.
 - sends runtime errors to `/runtime-events`
 - converts Sentry-style events into SignalForge runtime events
 - converts GlitchTip-style events into SignalForge runtime events
-- provides a lightweight feedback widget
+- installs browser-style global error handlers
+- mounts a reusable feedback widget
 
 ## Example
 
@@ -29,15 +30,22 @@ const sf = createSignalForgeAdapter({
   appName: 'readerapp',
   environment: 'production',
   release: '1.2.3',
+  routeResolver: () => window.location.pathname,
 });
 
 await sf.captureFeedback({
-  body: 'The save button freezes on mobile.',
-  appContext: { route: '/reader/42' },
+  title: 'Popup covers content',
+  body: 'The word popup overlaps the paragraph on mobile.',
+  categoryHint: 'bug',
 });
 
-await sf.captureError(new Error('reader timeout'), {
-  route: '/reader/42',
+await sf.captureError(new Error('reader timeout'));
+
+const uninstallGlobalErrorHandlers = sf.installGlobalErrorHandlers();
+
+sf.mountFeedbackWidget(document.getElementById('sf-feedback-root'), {
+  includeContactField: true,
+  defaultOpen: false,
 });
 ```
 
@@ -48,7 +56,7 @@ SignalForge should not replace a mature error collection provider.
 Recommended layering:
 
 - Sentry or GlitchTip collects runtime exceptions
-- `@signalforge/adapter` normalizes the event
+- `@signalforge/adapter` normalizes the event and captures product context
 - SignalForge turns the event into an engineering case
 
 ## Main Exports
@@ -59,3 +67,19 @@ Recommended layering:
 - `linkSentry`
 - `linkGlitchTip`
 - `mountFeedbackWidget`
+- `submitFeedback`
+- `submitRuntimeEvent`
+
+## Why This Shape
+
+The adapter exists for developers who already have an app and do not want to wire raw intake endpoints by hand.
+
+The intended default setup is:
+
+- install the adapter once
+- capture direct user feedback through the widget
+- capture explicit app errors through `captureError`
+- optionally bind browser global errors
+- optionally forward Sentry or GlitchTip events
+
+This is the first practical integration layer for early-stage teams using SignalForge as a feedback-to-GitHub operating loop.

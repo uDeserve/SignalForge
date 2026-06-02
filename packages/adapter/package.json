@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "exports": "./src/index.js",
   "scripts": {
     "build": "node -e \"console.log('adapter build placeholder')\"",
     "lint": "node -e \"console.log('adapter lint placeholder')\"",

@@ -67,6 +67,12 @@ const sf = createSignalForgeAdapter({
 
 await sf.captureFeedback({ body: 'Save button freezes on mobile.' });
 await sf.captureError(new Error('reader timeout'));
+
+const unbind = sf.installGlobalErrorHandlers();
+sf.mountFeedbackWidget(document.getElementById('sf-root'), {
+  defaultOpen: false,
+  includeContactField: true,
+});
 ```
 
 ## Current Foundation

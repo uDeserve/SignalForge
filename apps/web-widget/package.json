@@ -3,11 +3,12 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "exports": "./src/index.js",
   "scripts": {
     "dev": "node src/index.js",
     "build": "node -e \"console.log('web-widget build placeholder')\"",
     "lint": "node -e \"console.log('web-widget lint placeholder')\"",
-    "test": "node -e \"console.log('web-widget test placeholder')\"",
+    "test": "node --test",
     "typecheck": "node -e \"console.log('web-widget typecheck placeholder')\""
   }
 }
