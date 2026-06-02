@@ -79,6 +79,28 @@ await sf.captureError(new Error('reader timeout'));
 - MCP bridge for case listing, context fetch, and delegation
 - adapter-first easy start for web projects
 
+## Verified Live E2E
+
+SignalForge has now been validated against a real public GitHub App flow:
+
+- deployed behind HTTPS at `sf.launchhub.icu`
+- real GitHub App issue publication
+- real GitHub webhook delivery
+- real owner decision sync from GitHub issue comments back into SignalForge state
+
+The verified flow is:
+
+```text
+feedback submission
+-> case creation
+-> GitHub issue publish
+-> owner comments /accept or /defer on the issue
+-> GitHub webhook
+-> SignalForge decision record + case status update
+```
+
+See `docs/live-e2e.md` for the deployed topology, verification notes, and known gaps.
+
 ## GitHub Publication Modes
 
 SignalForge currently supports a staged GitHub publication strategy:
@@ -145,6 +167,7 @@ This keeps SignalForge focused on the engineering loop instead of low-level SDK 
 - `docs/llm-triage.md`
 - `docs/readerapp-e2e-sample.md`
 - `docs/github-app-setup.md`
+- `docs/live-e2e.md`
 
 ## LLM Setup
 

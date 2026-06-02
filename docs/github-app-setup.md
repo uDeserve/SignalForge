@@ -94,8 +94,56 @@ What is already implemented:
 - installation token exchange
 - issue publication through installation token
 
-What still needs a real external validation run:
+What has now been externally validated:
 
 - actual GitHub App credentials
 - actual installation on a repo
+- actual issue creation on GitHub
 - actual webhook delivery from GitHub to SignalForge
+- actual owner decision sync through issue comments
+
+## Verified Production-Like Flow
+
+The following path has been confirmed against a live deployment:
+
+```text
+SignalForge case
+-> GitHub App publisher
+-> real GitHub issue
+-> maintainer comment command
+-> GitHub webhook
+-> SignalForge decision record
+-> case status update
+```
+
+## Common Failure Mode
+
+If issue creation works but comment commands do not update SignalForge, check the GitHub App installation payload.
+
+The usual mistake is:
+
+- subscribed events only include `issues`
+- `issue_comment` was not enabled
+
+In GitHub App settings, verify:
+
+- Subscribe to events:
+  - `Issues`
+  - `Issue comment`
+
+You can confirm this in GitHub App Recent Deliveries:
+
+- the installation payload should show both event names
+- comment deliveries should appear as `issue_comment`
+
+## Live Endpoint Shape
+
+For a deployed SignalForge instance behind HTTPS, keep SSL verification enabled and point GitHub to:
+
+- Webhook URL: `https://your-domain.example/webhooks/github`
+
+SignalForge expects:
+
+- `POST /webhooks/github`
+- `x-github-event`
+- `x-hub-signature-256`

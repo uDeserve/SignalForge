@@ -33,3 +33,17 @@ Current progress:
 - agent delegation bridge: in progress
 - runtime signal integration: in progress
 - privacy hardening: baseline implemented for public GitHub publication
+
+## Phase 4
+
+- ship a reusable feedback widget
+- add first-class Sentry and GlitchTip bridges
+- add webhook activity and operator audit logging
+- wire issue comment decisions into real skill or agent delegation
+
+## Phase 5
+
+- delegated fix execution
+- PR creation and review loop
+- merge and deploy handoff patterns
+- reusable starter templates for existing web products
