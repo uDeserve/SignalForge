@@ -48,7 +48,7 @@ This is "turn repeated user pain into fewer, higher-value GitHub issues."
 ## System Flow
 
 <p align="center">
-  <img src="./docs/assets/signalforge-flow.svg" alt="SignalForge system flow" width="100%" />
+  <img src="./docs/assets/signalforge-flow-image2.png" alt="SignalForge system flow graphic" width="100%" />
 </p>
 
 ```text
