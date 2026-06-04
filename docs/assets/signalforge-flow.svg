@@ -11,38 +11,59 @@
   </defs>
   <rect width="1440" height="900" rx="36" fill="url(#bg)"/>
   <text x="120" y="146" fill="#0E1726" font-family="Avenir Next, Segoe UI, Arial, sans-serif" font-size="40" font-weight="700">SignalForge system flow</text>
-  <text x="120" y="188" fill="#5E708C" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="20" font-weight="500">Merge repeated user pain into one high-signal case, then keep the decision loop inside GitHub.</text>
+  <text fill="#5E708C" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="20" font-weight="500">
+    <tspan x="120" y="188">Merge repeated user pain into one high-signal case,</tspan>
+    <tspan x="120" y="216">then keep the decision loop inside GitHub.</tspan>
+  </text>
 
   <rect x="120" y="252" width="240" height="140" rx="28" fill="#FFFFFF" stroke="#D7E0EC"/>
   <rect x="120" y="438" width="240" height="140" rx="28" fill="#FFFFFF" stroke="#D7E0EC"/>
   <rect x="120" y="624" width="240" height="140" rx="28" fill="#FFFFFF" stroke="#D7E0EC"/>
   <text x="154" y="314" fill="#0E1726" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="24" font-weight="700">Feedback intake</text>
-  <text x="154" y="350" fill="#62758F" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="16">Widget, adapter, manual import</text>
+  <text fill="#62758F" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="16">
+    <tspan x="154" y="350">Widget, adapter,</tspan>
+    <tspan x="154" y="374">manual import</tspan>
+  </text>
   <text x="154" y="500" fill="#0E1726" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="24" font-weight="700">Runtime signals</text>
-  <text x="154" y="536" fill="#62758F" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="16">Sentry, GlitchTip, custom webhooks</text>
+  <text fill="#62758F" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="16">
+    <tspan x="154" y="536">Sentry, GlitchTip,</tspan>
+    <tspan x="154" y="560">custom webhooks</tspan>
+  </text>
   <text x="154" y="686" fill="#0E1726" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="24" font-weight="700">Context layer</text>
-  <text x="154" y="722" fill="#62758F" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="16">Route, release, feature, source kind</text>
+  <text fill="#62758F" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="16">
+    <tspan x="154" y="722">Route, release, feature,</tspan>
+    <tspan x="154" y="746">source kind</tspan>
+  </text>
 
   <rect x="508" y="314" width="424" height="388" rx="34" fill="#0F172A"/>
   <rect x="534" y="340" width="372" height="336" rx="28" fill="#121D33" stroke="#2B3A57"/>
   <text x="566" y="392" fill="#9AE6FF" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="17" font-weight="700">CASE INTELLIGENCE LAYER</text>
   <text x="566" y="440" fill="#F7FAFC" font-family="Avenir Next, Segoe UI, Arial, sans-serif" font-size="30" font-weight="700">Aggregate. Normalize. Decide.</text>
-  <text x="566" y="486" fill="#8FA3C4" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="17">Stable clustering, canonical synthesis, publication policy, owner-ready metadata.</text>
-  <rect x="566" y="528" width="118" height="34" rx="17" fill="#143247" stroke="#38BDF8"/>
-  <rect x="696" y="528" width="116" height="34" rx="17" fill="#16343B" stroke="#34D399"/>
-  <rect x="824" y="528" width="82" height="34" rx="17" fill="#2A2438" stroke="#C084FC"/>
-  <text x="591" y="550" fill="#A5E9FF" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="13" font-weight="600">cluster</text>
-  <text x="724" y="550" fill="#AEF4DD" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="13" font-weight="600">publish</text>
-  <text x="846" y="550" fill="#DEB7FF" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="13" font-weight="600">delegate</text>
-  <rect x="566" y="592" width="292" height="56" rx="20" fill="#0D1526" stroke="#2B3A57"/>
-  <text x="592" y="626" fill="#F7FAFC" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="18" font-weight="600">Reader popup blocks content</text>
+  <text fill="#8FA3C4" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="17">
+    <tspan x="566" y="486">Stable clustering, canonical synthesis,</tspan>
+    <tspan x="566" y="512">publication policy, owner-ready metadata.</tspan>
+  </text>
+  <rect x="566" y="544" width="118" height="34" rx="17" fill="#143247" stroke="#38BDF8"/>
+  <rect x="696" y="544" width="116" height="34" rx="17" fill="#16343B" stroke="#34D399"/>
+  <rect x="824" y="544" width="82" height="34" rx="17" fill="#2A2438" stroke="#C084FC"/>
+  <text x="591" y="566" fill="#A5E9FF" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="13" font-weight="600">cluster</text>
+  <text x="724" y="566" fill="#AEF4DD" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="13" font-weight="600">publish</text>
+  <text x="846" y="566" fill="#DEB7FF" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="13" font-weight="600">delegate</text>
+  <rect x="566" y="606" width="292" height="56" rx="20" fill="#0D1526" stroke="#2B3A57"/>
+  <text x="592" y="640" fill="#F7FAFC" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="18" font-weight="600">Reader popup blocks content</text>
 
   <rect x="1080" y="332" width="240" height="160" rx="28" fill="#FFFFFF" stroke="#D7E0EC"/>
   <rect x="1080" y="526" width="240" height="160" rx="28" fill="#FFFFFF" stroke="#D7E0EC"/>
   <text x="1112" y="394" fill="#0E1726" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="24" font-weight="700">GitHub issue</text>
-  <text x="1112" y="430" fill="#62758F" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="16">Auto-publish when case policy allows</text>
+  <text fill="#62758F" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="16">
+    <tspan x="1112" y="430">Auto-publish when case</tspan>
+    <tspan x="1112" y="454">policy allows</tspan>
+  </text>
   <text x="1112" y="588" fill="#0E1726" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="24" font-weight="700">Maintainer loop</text>
-  <text x="1112" y="624" fill="#62758F" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="16">/accept, /defer, /delegate inside GitHub</text>
+  <text fill="#62758F" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="16">
+    <tspan x="1112" y="624">/accept, /defer, /delegate</tspan>
+    <tspan x="1112" y="648">inside GitHub</tspan>
+  </text>
 
   <path d="M360 322H464" stroke="url(#accent)" stroke-width="4" stroke-linecap="round"/>
   <path d="M360 508H464" stroke="url(#accent)" stroke-width="4" stroke-linecap="round"/>
