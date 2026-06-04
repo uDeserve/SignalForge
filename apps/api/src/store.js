@@ -11,6 +11,30 @@ function ensureParentDir(filePath) {
   }
 }
 
+function reporterIdentity(reporter = {}) {
+  const candidates = [
+    reporter.id,
+    reporter.email,
+    reporter.userId,
+    reporter.externalId,
+    reporter.username,
+    reporter.name,
+  ];
+  const first = candidates.map((value) => String(value ?? '').trim()).find(Boolean);
+  if (first) return first.toLowerCase();
+  const entries = Object.entries(reporter ?? {}).filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== '');
+  return entries.length ? JSON.stringify(Object.fromEntries(entries)) : null;
+}
+
+function filterCases(items, filters = {}) {
+  return items.filter((item) => {
+    if (filters.status && item.status !== filters.status) return false;
+    if (filters.sourceKind && item.metadata?.sourceKind !== filters.sourceKind) return false;
+    if (typeof filters.published === 'boolean' && Boolean(item.publication?.published) !== filters.published) return false;
+    return true;
+  });
+}
+
 export function createStore(dbPath = process.env.SIGNALFORGE_DB_PATH || defaultDbPath) {
   ensureParentDir(dbPath);
   const db = new DatabaseSync(dbPath);
@@ -122,6 +146,24 @@ export function createStore(dbPath = process.env.SIGNALFORGE_DB_PATH || defaultD
       const row = db.prepare(`SELECT * FROM submissions WHERE id = ?`).get(id);
       return row ? hydrateSubmission(row) : null;
     },
+    listSubmissionsByIds(ids = []) {
+      if (!ids.length) return [];
+      const statement = db.prepare(`SELECT * FROM submissions WHERE id = ?`);
+      return ids.map((id) => statement.get(id)).filter(Boolean).map(hydrateSubmission);
+    },
+    listSubmissionsForCase(caseId) {
+      const caseRecord = this.getCase(caseId);
+      if (!caseRecord) return [];
+      return this.listSubmissionsByIds(caseRecord.links?.submissionIds ?? []);
+    },
+    countUniqueReportersForSubmissionIds(ids = []) {
+      const reporters = new Set();
+      for (const submission of this.listSubmissionsByIds(ids)) {
+        const identity = reporterIdentity(submission.reporter);
+        if (identity) reporters.add(identity);
+      }
+      return reporters.size;
+    },
     saveRuntimeEvent(event) {
       db.prepare(`
         INSERT INTO runtime_events (
@@ -222,8 +264,12 @@ export function createStore(dbPath = process.env.SIGNALFORGE_DB_PATH || defaultD
       );
       return getCaseByFingerprint(db, resolvedFingerprint);
     },
-    listCases() {
-      return db.prepare(`SELECT * FROM cases ORDER BY updated_at DESC`).all().map(hydrateCase);
+    findCaseByFingerprint(fingerprint) {
+      return getCaseByFingerprint(db, fingerprint);
+    },
+    listCases(filters = {}) {
+      const items = db.prepare(`SELECT * FROM cases ORDER BY updated_at DESC`).all().map(hydrateCase);
+      return filterCases(items, filters);
     },
     getCase(id) {
       const row = db.prepare(`SELECT * FROM cases WHERE id = ?`).get(id);

@@ -1,0 +1,46 @@
+<svg width="1440" height="860" viewBox="0 0 1440 860" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="160" y1="120" x2="1280" y2="760" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#09111D"/>
+      <stop offset="1" stop-color="#121A29"/>
+    </linearGradient>
+    <linearGradient id="card" x1="210" y1="160" x2="1230" y2="700" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#111B2D"/>
+      <stop offset="1" stop-color="#0F1726"/>
+    </linearGradient>
+  </defs>
+  <rect width="1440" height="860" rx="36" fill="url(#bg)"/>
+  <rect x="148" y="128" width="1144" height="604" rx="30" fill="url(#card)" stroke="#2C3952"/>
+  <text x="212" y="218" fill="#F4F7FB" font-family="Avenir Next, Segoe UI, Arial, sans-serif" font-size="46" font-weight="700">SignalForge</text>
+  <text x="212" y="264" fill="#8EA2C3" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="20" font-weight="500">From scattered feedback to one decision-ready GitHub issue</text>
+  <rect x="214" y="328" width="252" height="104" rx="24" fill="#152136" stroke="#2D3B56"/>
+  <rect x="214" y="462" width="252" height="104" rx="24" fill="#152136" stroke="#2D3B56"/>
+  <rect x="214" y="596" width="252" height="104" rx="24" fill="#152136" stroke="#2D3B56"/>
+  <text x="248" y="372" fill="#F4F7FB" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="20" font-weight="600">User feedback</text>
+  <text x="248" y="404" fill="#8EA2C3" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="15">Comments, screenshots, repeated complaints</text>
+  <text x="248" y="506" fill="#F4F7FB" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="20" font-weight="600">Runtime signals</text>
+  <text x="248" y="538" fill="#8EA2C3" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="15">Routes, releases, errors, environment</text>
+  <text x="248" y="640" fill="#F4F7FB" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="20" font-weight="600">Product context</text>
+  <text x="248" y="672" fill="#8EA2C3" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="15">Feature, source, owner, decision history</text>
+  <rect x="548" y="304" width="368" height="248" rx="30" fill="#0F1A2C" stroke="#57C9FF" stroke-width="2"/>
+  <text x="586" y="352" fill="#C6F4FF" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="17" font-weight="700">AGGREGATED CASE</text>
+  <text x="586" y="400" fill="#F4F7FB" font-family="Avenir Next, Segoe UI, Arial, sans-serif" font-size="28" font-weight="700">Reader popup blocks content</text>
+  <text x="586" y="440" fill="#9CB0CE" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="16">2 submissions   •   2 reporters   •   mobile reader</text>
+  <rect x="586" y="468" width="124" height="30" rx="15" fill="#143247" stroke="#57C9FF"/>
+  <rect x="722" y="468" width="134" height="30" rx="15" fill="#173936" stroke="#8AF3D0"/>
+  <text x="615" y="488" fill="#96E4FF" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="13" font-weight="600">clustered</text>
+  <text x="754" y="488" fill="#A6F5D9" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="13" font-weight="600">publish_now</text>
+  <rect x="996" y="362" width="212" height="132" rx="24" fill="#151F31" stroke="#2D3B56"/>
+  <text x="1030" y="404" fill="#F4F7FB" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="22" font-weight="700">GitHub issue</text>
+  <text x="1030" y="438" fill="#8EA2C3" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="15">Maintainer decision stays in flow</text>
+  <text x="1030" y="466" fill="#8AF3D0" font-family="IBM Plex Sans, Segoe UI, Arial, sans-serif" font-size="14" font-weight="600">/accept   /defer   /delegate</text>
+  <path d="M466 380H522" stroke="#57C9FF" stroke-width="3" stroke-linecap="round"/>
+  <path d="M466 514H522" stroke="#57C9FF" stroke-width="3" stroke-linecap="round"/>
+  <path d="M466 648H522" stroke="#57C9FF" stroke-width="3" stroke-linecap="round"/>
+  <path d="M916 422H972" stroke="#8AF3D0" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="522" cy="380" r="6" fill="#7DEEFF"/>
+  <circle cx="522" cy="514" r="6" fill="#7DEEFF"/>
+  <circle cx="522" cy="648" r="6" fill="#7DEEFF"/>
+  <circle cx="972" cy="422" r="6" fill="#8AF3D0"/>
+  <text x="214" y="784" fill="#6F83A5" font-family="IBM Plex Mono, Consolas, monospace" font-size="15">feedback + runtime -&gt; aggregated case -&gt; GitHub issue -&gt; maintainer decision</text>
+</svg>

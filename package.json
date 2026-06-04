@@ -2,7 +2,7 @@
   "name": "signalforge",
   "private": true,
   "version": "0.1.0",
-  "description": "GitHub-native feedback triage and case publication layer",
+  "description": "Turn user feedback into decision-ready GitHub issues.",
   "license": "MIT",
   "packageManager": "npm@10.9.7",
   "workspaces": [

@@ -1,44 +1,152 @@
 # API Contract
 
-The platform API should support:
+SignalForge exposes an API for turning raw signals into stateful, reviewable cases.
 
-- feedback submission ingestion
-- runtime error ingestion
-- case triage
-- case retrieval
-- case context retrieval
-- GitHub publication
-- owner decision capture
-- agent delegation
+The contract should feel stable from an integrator's point of view even as the triage logic evolves underneath it.
 
-The API should remain explicit, idempotent where needed, and conservative about privacy.
+## Contract Goals
 
-The easy-start adapter should map app-level feedback and runtime errors into these platform APIs without requiring the application developer to learn the internal case model first.
+The API should make it easy to:
 
-## Triage Boundary
+- submit end-user feedback
+- submit runtime signals
+- run triage and aggregation
+- retrieve aggregated cases
+- inspect case evidence and context
+- publish cases to GitHub when policy allows
+- capture maintainer decisions
 
-The platform should expose a triage boundary between raw intake and case publication.
+The API should avoid forcing integrators to learn the full internal model before they can adopt the system.
 
-That boundary may be implemented by:
+## Product Objects
 
-- deterministic heuristics
-- an LLM-assisted triage layer
-- or a hybrid pipeline
+The contract should distinguish clearly between:
 
-The contract should stay stable even if the underlying triage strategy changes.
+- submissions
+- cases
+- publications
+- decisions
 
-## Publication Policy
+Those are related, but they are not interchangeable.
 
-The API should support automatic issue publication after triage.
+### Submission
 
-The important owner decision is not "should this be published as an issue" but:
+A submission is a raw signal.
 
-- should this published issue enter the execution loop
+Examples:
 
-This means the platform should preserve:
+- a user feedback report
+- a runtime exception payload
+- an adapter-captured complaint from an app surface
 
+### Case
+
+A case is the canonical aggregated object.
+
+It should contain:
+
+- canonical title and summary
+- classification
+- linked submission evidence
+- readiness state
+- publication status
+- decision state
+
+### Publication
+
+A publication is the external artifact created from a case.
+
+In this phase, that usually means a GitHub issue.
+
+### Decision
+
+A decision is the maintainer-controlled state that determines what should happen after publication.
+
+## Behavioral Expectations
+
+The contract should preserve a few strong guarantees.
+
+### 1. Triage Is Aggregation-Aware
+
+Running triage should not imply "create a new case every time."
+
+Instead, triage should upsert against the canonical case pool:
+
+- merge into an existing case when cluster identity matches
+- create a new case when no matching case exists
+
+This is one of the most important product behaviors in SignalForge.
+
+### 2. Cases Are The Inbox Surface
+
+`GET /cases` should function as a real owner inbox API, not just a raw database listing.
+
+It should return enough metadata for a maintainer or future frontend to act without fetching multiple extra resources for basic review.
+
+That includes:
+
+- title
+- summary
+- classification
+- evidence counts
+- latest seen time
+- publish policy outcome
 - publication state
-- execution decision state
-- delegation state
 
-as separate concepts.
+### 3. Publication Is Policy-Driven
+
+The API should support automatic publication, but only after policy evaluation.
+
+This means:
+
+- publication can happen automatically
+- execution should still remain a separate decision boundary
+
+### 4. LLM Use Must Stay Replaceable
+
+The API contract must not depend on a specific model provider.
+
+Clients should not have to care whether triage used:
+
+- heuristics only
+- heuristics plus LLM enrichment
+- future hybrid approaches
+
+The output contract matters more than the internal reasoning path.
+
+## Contract Style
+
+The API should be:
+
+- explicit
+- additive where possible
+- safe by default
+- privacy-conscious
+- stable enough to support an adapter-first integration path
+
+## Practical Endpoint Shape
+
+In practical terms, the platform needs endpoints for:
+
+- submission ingestion
+- triage execution
+- case listing
+- case detail and context retrieval
+- GitHub publication
+- maintainer decision capture
+
+The exact route names can evolve, but the boundary between these responsibilities should stay clear.
+
+## Integration Promise
+
+An application integrating SignalForge should be able to do the following with minimal setup:
+
+1. send feedback or errors
+2. let SignalForge aggregate them into cases
+3. review those cases through the inbox API
+4. allow GitHub publication when policy permits
+5. capture downstream maintainer decisions
+
+That is the practical promise of the API:
+
+simple intake, stronger case formation, cleaner engineering action.

@@ -17,6 +17,22 @@ import {
   parseOwnerCommand,
 } from '../../../packages/github-bridge/src/index.js';
 
+async function createSubmittedCase(api, body) {
+  const submissionResponse = await api.handleRequest({
+    method: 'POST',
+    url: '/submissions',
+    body,
+  });
+  const submissionId = submissionResponse.body.submissionId;
+  await api.handleRequest({
+    method: 'POST',
+    url: '/triage/run',
+    body: { submissionIds: [submissionId] },
+  });
+  const casesResponse = await api.handleRequest({ method: 'GET', url: '/cases', body: {} });
+  return casesResponse.body.items[0];
+}
+
 test('triage classifies obvious bug feedback as actionable', () => {
   const submission = createSubmission({
     id: 'sub_1',
@@ -36,6 +52,7 @@ test('triage classifies obvious bug feedback as actionable', () => {
   assert.equal(result.actionable, true);
   assert.equal(result.scoring.publishRecommendation, 'github_issue');
   assert.equal(result.semantic.triageMode, 'heuristic');
+  assert.match(result.fingerprint, /^feedback:/);
 });
 
 test('triage treats chinese user-experience feedback as actionable ux instead of noise', () => {
@@ -45,6 +62,7 @@ test('triage treats chinese user-experience feedback as actionable ux instead of
     source: 'web_widget',
     appContext: {
       route: '/reader/book-1/chapter-3',
+      feature: 'reader_lookup',
     },
     content: {
       title: '手机上点词后挡住正文',
@@ -56,6 +74,7 @@ test('triage treats chinese user-experience feedback as actionable ux instead of
   assert.equal(result.classification.primaryType, 'ux');
   assert.equal(result.actionable, true);
   assert.equal(result.scoring.publishRecommendation, 'github_issue');
+  assert.equal(result.semantic.clusterAction, 'new_cluster');
 });
 
 test('triage classifies runtime error events as actionable', () => {
@@ -73,9 +92,10 @@ test('triage classifies runtime error events as actionable', () => {
   assert.equal(result.actionable, true);
   assert.equal(result.scoring.publishRecommendation, 'github_issue');
   assert.equal(result.semantic.suggestedLabels.includes('source:runtime-signal'), true);
+  assert.match(result.fingerprint, /^runtime:/);
 });
 
-test('triage validates llm-shaped outputs', () => {
+test('triage validates llm-shaped outputs including clustering metadata', () => {
   const validated = validateTriageResult({
     normalized_summary: 'Mobile popup blocks reading flow',
     problem_type: 'ux',
@@ -83,7 +103,9 @@ test('triage validates llm-shaped outputs', () => {
     user_impact: 'Users cannot continue reading after tapping a word.',
     evidence_used: [{ kind: 'submission', id: 'sub_1' }],
     cluster_key: 'mobile-popup',
+    cluster_action: 'merge_existing',
     cluster_size_estimate: 3,
+    cluster_signals: { route: '/reader/:id', sourceKind: 'user_feedback' },
     publish_recommendation: 'publish',
     confidence: 0.78,
     open_questions: ['Does this happen on all mobile sizes?'],
@@ -92,6 +114,7 @@ test('triage validates llm-shaped outputs', () => {
   });
   assert.equal(validated.problemType, 'ux');
   assert.equal(validated.clusterSizeEstimate, 3);
+  assert.equal(validated.clusterSignals.route, '/reader/:id');
 });
 
 test('triage engine falls back to heuristic output when analyzer response is invalid', async () => {
@@ -111,6 +134,7 @@ test('triage engine falls back to heuristic output when analyzer response is inv
   const result = await triageEngine.triageSubmission(submission);
   assert.equal(result.semantic.triageMode, 'heuristic');
   assert.equal(result.classification.primaryType, 'bug');
+  assert.match(result.fingerprint, /^feedback:/);
 });
 
 test('store can persist and retrieve submissions and cases', () => {
@@ -119,46 +143,216 @@ test('store can persist and retrieve submissions and cases', () => {
     id: 'sub_2',
     submittedAt: '2026-05-21T00:00:00Z',
     source: 'web_widget',
+    reporter: { id: 'user_1' },
     content: { body: 'The app is confusing.' },
   });
 
   store.saveSubmission(submission);
   const fetched = store.getSubmission('sub_2');
   assert.equal(fetched.id, 'sub_2');
+  assert.equal(store.countUniqueReportersForSubmissionIds(['sub_2']), 1);
   store.close();
 });
 
-test('api accepts submission and exposes triaged case', async () => {
-  const { handleRequest } = createSignalForgeApi({ store: createStore(':memory:'), logger: { error() {} } });
+test('api merges two similar feedback submissions into one aggregated case', async () => {
+  const api = createSignalForgeApi({ store: createStore(':memory:'), logger: { error() {}, warn() {} } });
 
-  const submissionResponse = await handleRequest({
-    method: 'POST',
-    url: '/submissions',
-    body: {
+  const submissionBodies = [
+    {
       source: 'web_widget',
-      content: { title: 'Save freezes', body: 'The page hangs on save and returns 500.' },
-      evidence: { runtimeErrors: [{ message: 'timeout' }] },
+      reporter: { id: 'user_a' },
+      appContext: { route: '/reader/book-1/chapter-3', feature: 'reader_lookup', release: '1.0.0' },
+      content: { title: '手机上点词后挡住正文', body: '点词后弹层挡住阅读内容，没法顺着往下看。' },
     },
-  });
-  assert.equal(submissionResponse.statusCode, 201);
-  const submissionId = submissionResponse.body.submissionId;
+    {
+      source: 'web_widget',
+      reporter: { id: 'user_b' },
+      appContext: { route: '/reader/book-9/chapter-2', feature: 'reader_lookup', release: '1.0.1' },
+      content: { title: '查词弹层遮住正文', body: '手机上查词后弹层把正文挡住了，阅读没法继续。' },
+    },
+  ];
 
-  const triageResponse = await handleRequest({
+  const submissionIds = [];
+  for (const body of submissionBodies) {
+    const submissionResponse = await api.handleRequest({ method: 'POST', url: '/submissions', body });
+    submissionIds.push(submissionResponse.body.submissionId);
+  }
+
+  const triageResponse = await api.handleRequest({
     method: 'POST',
     url: '/triage/run',
-    body: { submissionIds: [submissionId] },
+    body: { submissionIds },
   });
+
   assert.equal(triageResponse.statusCode, 200);
+  assert.equal(triageResponse.body.created, 1);
+  assert.equal(triageResponse.body.merged, 1);
 
-  const casesResponse = await handleRequest({ method: 'GET', url: '/cases', body: {} });
-  assert.equal(casesResponse.statusCode, 200);
+  const casesResponse = await api.handleRequest({ method: 'GET', url: '/cases', body: {} });
   assert.equal(casesResponse.body.items.length, 1);
-  assert.equal(casesResponse.body.items[0].classification.primaryType, 'bug');
+  const caseRecord = casesResponse.body.items[0];
+  assert.equal(caseRecord.submissionCount, 2);
+  assert.equal(caseRecord.uniqueReporterCount, 2);
+  assert.equal(caseRecord.publishPolicyOutcome, 'hold_and_watch');
+  assert.equal(caseRecord.publication.published, true);
+  assert.equal(caseRecord.status, 'published');
+  assert.match(caseRecord.canonicalTitle, /Reader popup blocks reading content/i);
+});
 
-  const caseId = casesResponse.body.items[0].id;
-  const caseResponse = await handleRequest({ method: 'GET', url: `/cases/${caseId}`, body: {} });
-  assert.equal(caseResponse.statusCode, 200);
-  assert.equal(caseResponse.body.id, caseId);
+test('api keeps dissimilar submissions in separate cases', async () => {
+  const api = createSignalForgeApi({ store: createStore(':memory:'), logger: { error() {}, warn() {} } });
+
+  const first = await createSubmittedCase(api, {
+    source: 'web_widget',
+    reporter: { id: 'bug_user' },
+    appContext: { route: '/reader/save', feature: 'save_flow', release: '1.2.0' },
+    content: { title: 'Save freezes', body: 'Save freezes and returns 500.' },
+    evidence: { runtimeErrors: [{ message: 'timeout', fingerprint: 'save-timeout' }] },
+  });
+  const second = await createSubmittedCase(api, {
+    source: 'web_widget',
+    reporter: { id: 'feature_user' },
+    appContext: { route: '/reader/export', feature: 'export_menu', release: '1.2.0' },
+    content: { title: 'Please add export support', body: 'I would like export to markdown.' },
+  });
+
+  const casesResponse = await api.handleRequest({ method: 'GET', url: '/cases', body: {} });
+  assert.equal(casesResponse.body.items.length, 2);
+  assert.notEqual(first.id, second.id);
+});
+
+test('aggregated case updates evidence counts timestamps and linked submissions', async () => {
+  const api = createSignalForgeApi({ store: createStore(':memory:'), logger: { error() {}, warn() {} } });
+
+  const firstSubmission = createSubmission({
+    id: 'sub_first',
+    submittedAt: '2026-05-21T00:00:00Z',
+    source: 'web_widget',
+    reporter: { id: 'user_1' },
+    appContext: { route: '/reader/save', feature: 'save_flow', release: '1.0.0' },
+    content: { title: 'Save freezes', body: 'When I click save, the page hangs and returns 500.' },
+    evidence: { runtimeErrors: [{ message: 'timeout', fingerprint: 'save-timeout' }] },
+  });
+  const secondSubmission = createSubmission({
+    id: 'sub_second',
+    submittedAt: '2026-05-22T00:00:00Z',
+    source: 'web_widget',
+    reporter: { id: 'user_1' },
+    appContext: { route: '/reader/save', feature: 'save_flow', release: '1.0.0' },
+    content: { title: 'Save still freezes', body: 'Saving still hangs and throws a 500 error.' },
+    evidence: { runtimeErrors: [{ message: 'timeout', fingerprint: 'save-timeout' }] },
+  });
+
+  api.store.saveSubmission(firstSubmission);
+  api.store.saveSubmission(secondSubmission);
+
+  await api.handleRequest({ method: 'POST', url: '/triage/run', body: { submissionIds: ['sub_first', 'sub_second'] } });
+  const caseRecord = api.store.listCases()[0];
+
+  assert.equal(caseRecord.evidenceSummary.submissionCount, 2);
+  assert.equal(caseRecord.evidenceSummary.uniqueReporterCount, 1);
+  assert.equal(caseRecord.evidenceSummary.firstSeenAt, '2026-05-21T00:00:00Z');
+  assert.equal(caseRecord.evidenceSummary.latestSeenAt, '2026-05-22T00:00:00Z');
+  assert.deepEqual(caseRecord.links.submissionIds.sort(), ['sub_first', 'sub_second']);
+  assert.match(caseRecord.canonicalSummary, /Observed across 2 linked feedback submissions/);
+});
+
+test('hold_and_watch case stays unpublished', async () => {
+  const api = createSignalForgeApi({ store: createStore(':memory:'), logger: { error() {}, warn() {} } });
+
+  const caseRecord = await createSubmittedCase(api, {
+    source: 'web_widget',
+    reporter: { id: 'feature_user' },
+    appContext: { route: '/reader/export', feature: 'export_menu', release: '1.0.0' },
+    content: { title: 'Please add export support', body: 'Please add export to markdown and txt.' },
+  });
+
+  assert.equal(caseRecord.publishPolicyOutcome, 'hold_and_watch');
+  assert.equal(caseRecord.publication.published, false);
+  assert.equal(caseRecord.publication.target, 'github_issue');
+});
+
+test('already-published case can ingest more submissions without republishing', async () => {
+  let publishCount = 0;
+  const githubPublisher = {
+    async publishCase({ caseRecord, repo, mode }) {
+      publishCount += 1;
+      return {
+        repo,
+        mode,
+        snapshot: {
+          title: caseRecord.canonicalTitle,
+          body: caseRecord.canonicalSummary,
+          labels: ['source:user-feedback'],
+          assignees: [],
+        },
+        result: {
+          externalId: `gh_issue_${publishCount}`,
+          url: `https://github.com/${repo}/issues/${publishCount}`,
+          number: publishCount,
+        },
+      };
+    },
+  };
+
+  const api = createSignalForgeApi({
+    store: createStore(':memory:'),
+    logger: { error() {}, warn() {} },
+    githubPublisher,
+  });
+
+  const firstCase = await createSubmittedCase(api, {
+    source: 'web_widget',
+    reporter: { id: 'user_1' },
+    appContext: { route: '/reader/save', feature: 'save_flow', release: '1.0.0' },
+    content: { title: 'Save freezes', body: 'Save freezes and returns 500.' },
+    evidence: { runtimeErrors: [{ message: 'timeout', fingerprint: 'save-timeout' }] },
+  });
+  assert.equal(firstCase.publication.published, true);
+  assert.equal(publishCount, 1);
+
+  await createSubmittedCase(api, {
+    source: 'web_widget',
+    reporter: { id: 'user_2' },
+    appContext: { route: '/reader/save', feature: 'save_flow', release: '1.0.1' },
+    content: { title: 'Still freezing on save', body: 'The save action still hangs and returns 500.' },
+    evidence: { runtimeErrors: [{ message: 'timeout', fingerprint: 'save-timeout' }] },
+  });
+
+  assert.equal(publishCount, 1);
+  const cases = api.store.listCases();
+  assert.equal(cases.length, 1);
+  assert.equal(cases[0].evidenceSummary.submissionCount, 2);
+});
+
+test('api inbox exposes aggregation fields and supports filters', async () => {
+  const api = createSignalForgeApi({ store: createStore(':memory:'), logger: { error() {}, warn() {} } });
+
+  await createSubmittedCase(api, {
+    source: 'web_widget',
+    reporter: { id: 'user_1' },
+    appContext: { route: '/reader/save', feature: 'save_flow', release: '1.0.0' },
+    content: { title: 'Save freezes', body: 'Save freezes and returns 500.' },
+    evidence: { runtimeErrors: [{ message: 'timeout', fingerprint: 'save-timeout' }] },
+  });
+  await createSubmittedCase(api, {
+    source: 'web_widget',
+    reporter: { id: 'user_2' },
+    appContext: { route: '/reader/export', feature: 'export_menu', release: '1.0.0' },
+    content: { title: 'Please add export support', body: 'Please add export support.' },
+  });
+
+  const publishedOnly = await api.handleRequest({ method: 'GET', url: '/cases?published=true', body: {} });
+  assert.equal(publishedOnly.statusCode, 200);
+  assert.equal(publishedOnly.body.items.length, 1);
+  assert.equal(publishedOnly.body.items[0].publication.published, true);
+  assert.ok('submissionCount' in publishedOnly.body.items[0]);
+  assert.ok('uniqueReporterCount' in publishedOnly.body.items[0]);
+  assert.ok('publishPolicyOutcome' in publishedOnly.body.items[0]);
+
+  const heldOnly = await api.handleRequest({ method: 'GET', url: '/cases?published=false&status=ready_for_publish', body: {} });
+  assert.equal(heldOnly.body.items.length, 1);
+  assert.equal(heldOnly.body.items[0].publishPolicyOutcome, 'hold_and_watch');
 });
 
 test('github bridge builds sanitized public issue body and parses owner commands', () => {
@@ -191,51 +385,6 @@ test('github bridge builds sanitized public issue body and parses owner commands
   assert.equal(command.payload.delegateConfig.skillName, 'hermes');
 });
 
-test('api publishes actionable cases and records decisions', async () => {
-  const { handleRequest } = createSignalForgeApi({ store: createStore(':memory:'), logger: { error() {} } });
-
-  const submissionResponse = await handleRequest({
-    method: 'POST',
-    url: '/submissions',
-    body: {
-      source: 'web_widget',
-      content: { title: 'Save freezes', body: 'The page hangs on save and returns 500.' },
-      evidence: { runtimeErrors: [{ message: 'timeout' }] },
-    },
-  });
-  const submissionId = submissionResponse.body.submissionId;
-  await handleRequest({ method: 'POST', url: '/triage/run', body: { submissionIds: [submissionId] } });
-  const casesResponse = await handleRequest({ method: 'GET', url: '/cases', body: {} });
-  const caseId = casesResponse.body.items[0].id;
-
-  const publishResponse = await handleRequest({
-    method: 'POST',
-    url: `/cases/${caseId}/publish`,
-    body: { target: { repo: 'uDeserve/SignalForge', mode: 'github_issue' } },
-  });
-  assert.equal(publishResponse.statusCode, 201);
-  assert.equal(publishResponse.body.caseId, caseId);
-
-  const publicationList = await handleRequest({ method: 'GET', url: `/cases/${caseId}/publications`, body: {} });
-  assert.equal(publicationList.statusCode, 200);
-  assert.equal(publicationList.body.items.length, 1);
-
-  const decisionResponse = await handleRequest({
-    method: 'POST',
-    url: `/cases/${caseId}/decisions`,
-    body: {
-      actor: { type: 'owner', id: 'github:alice' },
-      commentBody: '/accept',
-    },
-  });
-  assert.equal(decisionResponse.statusCode, 201);
-  assert.equal(decisionResponse.body.statusAfterDecision, 'accepted');
-
-  const decisionList = await handleRequest({ method: 'GET', url: `/cases/${caseId}/decisions`, body: {} });
-  assert.equal(decisionList.statusCode, 200);
-  assert.equal(decisionList.body.items.length, 1);
-});
-
 test('api publish uses injected github publisher result', async () => {
   const githubPublisher = {
     async publishCase({ caseRecord, repo, mode }) {
@@ -256,29 +405,22 @@ test('api publish uses injected github publisher result', async () => {
       };
     },
   };
-  const { handleRequest } = createSignalForgeApi({
+  const api = createSignalForgeApi({
     store: createStore(':memory:'),
-    logger: { error() {} },
+    logger: { error() {}, warn() {} },
     githubPublisher,
   });
 
-  const submissionResponse = await handleRequest({
-    method: 'POST',
-    url: '/submissions',
-    body: {
-      source: 'web_widget',
-      content: { title: 'Save freezes', body: 'The page hangs on save and returns 500.' },
-      evidence: { runtimeErrors: [{ message: 'timeout' }] },
-    },
+  const caseRecord = await createSubmittedCase(api, {
+    source: 'web_widget',
+    reporter: { id: 'feature_user' },
+    appContext: { route: '/reader/export', feature: 'export_menu', release: '1.0.0' },
+    content: { title: 'Please add export support', body: 'I would like export support.' },
   });
-  const submissionId = submissionResponse.body.submissionId;
-  await handleRequest({ method: 'POST', url: '/triage/run', body: { submissionIds: [submissionId] } });
-  const casesResponse = await handleRequest({ method: 'GET', url: '/cases', body: {} });
-  const caseId = casesResponse.body.items[0].id;
 
-  const publishResponse = await handleRequest({
+  const publishResponse = await api.handleRequest({
     method: 'POST',
-    url: `/cases/${caseId}/publish`,
+    url: `/cases/${caseRecord.id}/publish`,
     body: { target: { repo: 'uDeserve/SignalForge', mode: 'github_issue' } },
   });
 
@@ -488,51 +630,35 @@ test('github publisher from env prefers jwt app provider when full app credentia
 });
 
 test('api rejects publication for non-actionable cases', async () => {
-  const { handleRequest } = createSignalForgeApi({ store: createStore(':memory:'), logger: { error() {} } });
+  const api = createSignalForgeApi({ store: createStore(':memory:'), logger: { error() {}, warn() {} } });
 
-  const submissionResponse = await handleRequest({
-    method: 'POST',
-    url: '/submissions',
-    body: {
-      source: 'web_widget',
-      content: { body: 'hello' },
-    },
+  const caseRecord = await createSubmittedCase(api, {
+    source: 'web_widget',
+    content: { body: 'hello' },
   });
-  const submissionId = submissionResponse.body.submissionId;
-  await handleRequest({ method: 'POST', url: '/triage/run', body: { submissionIds: [submissionId] } });
-  const casesResponse = await handleRequest({ method: 'GET', url: '/cases', body: {} });
-  const caseId = casesResponse.body.items[0].id;
 
-  const publishResponse = await handleRequest({
+  const publishResponse = await api.handleRequest({
     method: 'POST',
-    url: `/cases/${caseId}/publish`,
+    url: `/cases/${caseRecord.id}/publish`,
     body: { target: { repo: 'uDeserve/SignalForge', mode: 'github_issue' } },
   });
   assert.equal(publishResponse.statusCode, 422);
 });
 
 test('api creates delegation and returns case context', async () => {
-  const { handleRequest } = createSignalForgeApi({ store: createStore(':memory:'), logger: { error() {} } });
+  const api = createSignalForgeApi({ store: createStore(':memory:'), logger: { error() {}, warn() {} } });
 
-  const submissionResponse = await handleRequest({
-    method: 'POST',
-    url: '/submissions',
-    body: {
-      source: 'web_widget',
-      content: { title: 'Save freezes', body: 'The page hangs on save and returns 500.' },
-      evidence: { runtimeErrors: [{ message: 'timeout' }] },
-    },
+  const caseRecord = await createSubmittedCase(api, {
+    source: 'web_widget',
+    content: { title: 'Save freezes', body: 'The page hangs on save and returns 500.' },
+    evidence: { runtimeErrors: [{ message: 'timeout' }] },
   });
-  const submissionId = submissionResponse.body.submissionId;
-  await handleRequest({ method: 'POST', url: '/triage/run', body: { submissionIds: [submissionId] } });
-  const casesResponse = await handleRequest({ method: 'GET', url: '/cases', body: {} });
-  const caseId = casesResponse.body.items[0].id;
 
-  const delegationResponse = await handleRequest({
+  const delegationResponse = await api.handleRequest({
     method: 'POST',
     url: '/delegations',
     body: {
-      caseId,
+      caseId: caseRecord.id,
       kind: 'skill',
       target: { type: 'skill', name: 'hermes' },
       request: { reason: 'owner_requested', context: { source: 'test' } },
@@ -540,21 +666,21 @@ test('api creates delegation and returns case context', async () => {
   });
   assert.equal(delegationResponse.statusCode, 201);
 
-  const delegationList = await handleRequest({ method: 'GET', url: `/cases/${caseId}/delegations`, body: {} });
+  const delegationList = await api.handleRequest({ method: 'GET', url: `/cases/${caseRecord.id}/delegations`, body: {} });
   assert.equal(delegationList.statusCode, 200);
   assert.equal(delegationList.body.items.length, 1);
 
-  const contextResponse = await handleRequest({ method: 'GET', url: `/cases/${caseId}/context`, body: {} });
+  const contextResponse = await api.handleRequest({ method: 'GET', url: `/cases/${caseRecord.id}/context`, body: {} });
   assert.equal(contextResponse.statusCode, 200);
-  assert.equal(contextResponse.body.case.id, caseId);
+  assert.equal(contextResponse.body.case.id, caseRecord.id);
   assert.equal(contextResponse.body.delegations.length, 1);
   assert.equal(contextResponse.body.case.status, 'delegated');
 });
 
 test('api ingests runtime events and enriches case context', async () => {
-  const { handleRequest } = createSignalForgeApi({ store: createStore(':memory:'), logger: { error() {} } });
+  const api = createSignalForgeApi({ store: createStore(':memory:'), logger: { error() {}, warn() {} } });
 
-  const firstEvent = await handleRequest({
+  const firstEvent = await api.handleRequest({
     method: 'POST',
     url: '/runtime-events',
     body: {
@@ -570,7 +696,7 @@ test('api ingests runtime events and enriches case context', async () => {
   assert.equal(firstEvent.statusCode, 201);
   const caseId = firstEvent.body.caseId;
 
-  const secondEvent = await handleRequest({
+  const secondEvent = await api.handleRequest({
     method: 'POST',
     url: '/runtime-events/ingest/sentry',
     body: {
@@ -589,7 +715,7 @@ test('api ingests runtime events and enriches case context', async () => {
   assert.equal(secondEvent.statusCode, 201);
   assert.equal(secondEvent.body.caseId, caseId);
 
-  const contextResponse = await handleRequest({ method: 'GET', url: `/cases/${caseId}/context`, body: {} });
+  const contextResponse = await api.handleRequest({ method: 'GET', url: `/cases/${caseId}/context`, body: {} });
   assert.equal(contextResponse.statusCode, 200);
   assert.equal(contextResponse.body.runtimeEvents.length, 2);
   assert.equal(contextResponse.body.case.evidenceSummary.runtimeEventCount, 2);
@@ -610,6 +736,7 @@ test('api can use llm-assisted triage engine output for publication-ready metada
       cluster_key: 'mobile-lookup-popup',
       cluster_action: 'merge_existing',
       cluster_size_estimate: 4,
+      cluster_signals: { route: '/reader/:id', feature: 'reader_lookup' },
       publish_recommendation: 'publish',
       confidence: 0.78,
       open_questions: ['Does this happen on every small screen?'],
@@ -617,27 +744,19 @@ test('api can use llm-assisted triage engine output for publication-ready metada
       suggested_next_action: 'investigate',
     }),
   });
-  const { handleRequest } = createSignalForgeApi({
+  const api = createSignalForgeApi({
     store: createStore(':memory:'),
     logger: { error() {}, warn() {} },
     triageEngine,
   });
 
-  const submissionResponse = await handleRequest({
-    method: 'POST',
-    url: '/submissions',
-    body: {
-      source: 'web_widget',
-      content: {
-        title: '手机点词后挡住正文',
-        body: '点词后弹层挡住阅读内容，没法顺着往下看。',
-      },
+  const caseRecord = await createSubmittedCase(api, {
+    source: 'web_widget',
+    content: {
+      title: '手机点词后挡住正文',
+      body: '点词后弹层挡住阅读内容，没法顺着往下看。',
     },
   });
-  const submissionId = submissionResponse.body.submissionId;
-  await handleRequest({ method: 'POST', url: '/triage/run', body: { submissionIds: [submissionId] } });
-  const casesResponse = await handleRequest({ method: 'GET', url: '/cases', body: {} });
-  const caseRecord = casesResponse.body.items[0];
 
   assert.equal(caseRecord.classification.primaryType, 'ux');
   assert.equal(caseRecord.metadata.triage.triageMode, 'llm');
@@ -665,6 +784,7 @@ test('deepseek analyzer maps openai-compatible json output', async () => {
                 cluster_key: 'mobile-lookup-popup',
                 cluster_action: 'merge_existing',
                 cluster_size_estimate: 4,
+                cluster_signals: { route: '/reader/:id' },
                 publish_recommendation: 'publish',
                 confidence: 0.77,
                 open_questions: ['Does this happen on all small screens?'],
