@@ -1,6 +1,27 @@
 # SignalForge
 
-Turn user feedback into decision-ready GitHub issues.
+<p align="center">
+  <strong>Case intelligence for product teams shipping on GitHub.</strong>
+</p>
+
+<p align="center">
+  Turn user feedback into decision-ready GitHub issues.
+</p>
+
+<p align="center">
+  <a href="./docs/vision.md"><img alt="GitHub-native case intelligence" src="https://img.shields.io/badge/GitHub--native-case%20intelligence-0F172A?style=flat-square&labelColor=EAF0F8" /></a>
+  <a href="./docs/api-contract.md"><img alt="API-first inbox" src="https://img.shields.io/badge/API--first-owner%20inbox-0B3B66?style=flat-square&labelColor=EDF7FF" /></a>
+  <a href="./docs/live-e2e.md"><img alt="Live GitHub loop verified" src="https://img.shields.io/badge/live%20GitHub%20loop-verified-065F46?style=flat-square&labelColor=ECFDF3" /></a>
+  <a href="./docs/llm-triage.md"><img alt="LLM advisory with heuristic fallback" src="https://img.shields.io/badge/LLM-advisory%20%2B%20heuristic%20fallback-4C1D95?style=flat-square&labelColor=F5F3FF" /></a>
+</p>
+
+<p align="center">
+  <a href="./docs/vision.md">Vision</a> ·
+  <a href="./docs/architecture.md">Architecture</a> ·
+  <a href="./docs/api-contract.md">API Contract</a> ·
+  <a href="./docs/live-e2e.md">Live E2E</a> ·
+  <a href="./docs/github-flow.md">GitHub Flow</a>
+</p>
 
 SignalForge merges duplicate feedback, enriches it with runtime context, and publishes the cases that deserve engineering attention.
 
@@ -9,6 +30,8 @@ It is built for teams that already live in GitHub and do not want another heavyw
 <p align="center">
   <img src="./docs/assets/signalforge-hero-image2.png" alt="SignalForge hero graphic" width="100%" />
 </p>
+
+> Fewer duplicate tickets. Better case formation. Faster maintainer decisions.
 
 ## Why It Lands
 
