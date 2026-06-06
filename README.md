@@ -81,6 +81,7 @@ Agent-friendly setup contract:
 Trust signals:
 
 - [Live E2E Verification](./docs/live-e2e.md)
+- [Omni Lingua Case Study](./docs/case-studies/omni-lingua.md)
 - [Quick Start](./docs/quick-start.md)
 - [Release Notes](./docs/releases/v0.1.0.md)
 - [Changelog](./CHANGELOG.md)
@@ -407,6 +408,7 @@ They need fast integration, a GitHub-native workflow, and a system that starts c
 ## Docs
 
 - `docs/vision.md`
+- `docs/case-studies/omni-lingua.md`
 - `docs/quick-start.md`
 - `docs/object-model.md`
 - `docs/api-contract.md`
