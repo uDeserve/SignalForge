@@ -82,6 +82,7 @@ Trust signals:
 
 - [Live E2E Verification](./docs/live-e2e.md)
 - [Quick Start](./docs/quick-start.md)
+- [Release Notes](./docs/releases/v0.1.0.md)
 - [Changelog](./CHANGELOG.md)
 - [Security Policy](./SECURITY.md)
 - [Support](./SUPPORT.md)
