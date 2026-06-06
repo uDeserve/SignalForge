@@ -71,6 +71,22 @@ Agent-friendly setup contract:
 
 > Plug in fast. Publish cleanly. Keep the decision loop in GitHub.
 
+## Project Status
+
+- live GitHub App publication and webhook decision sync verified
+- repo-local CLI for `sf:init`, `sf:doctor`, and `sf:start` is in place
+- adapter-first integration path exists for existing web apps
+- current maturity target is serious small-team adoption, not demo-only positioning
+
+Trust signals:
+
+- [Live E2E Verification](./docs/live-e2e.md)
+- [Quick Start](./docs/quick-start.md)
+- [Changelog](./CHANGELOG.md)
+- [Security Policy](./SECURITY.md)
+- [Support](./SUPPORT.md)
+- [License](./LICENSE)
+
 ## Why SignalForge Exists
 
 The software loop is being automated from the middle outward.
