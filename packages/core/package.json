@@ -2,7 +2,14 @@
   "name": "@signalforge/core",
   "private": true,
   "version": "0.1.0",
+  "description": "Core case intelligence primitives for the SignalForge feedback-to-issue pipeline.",
   "type": "module",
+  "keywords": [
+    "signalforge",
+    "case-intelligence",
+    "feedback-to-issue",
+    "developer-tools"
+  ],
   "scripts": {
     "build": "node -e \"console.log('core build placeholder')\"",
     "lint": "node -e \"console.log('core lint placeholder')\"",

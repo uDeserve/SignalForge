@@ -1,7 +1,7 @@
 {
   "name": "@signalforge/adapter",
   "version": "0.1.0",
-  "description": "Drop-in feedback and runtime adapter for existing web apps using SignalForge.",
+  "description": "Drop-in browser adapter for AI-native feedback capture, runtime signals, and SignalForge issue automation.",
   "license": "MIT",
   "type": "module",
   "exports": "./src/index.js",
@@ -11,9 +11,15 @@
   ],
   "keywords": [
     "signalforge",
+    "ai-native",
     "feedback",
+    "product-feedback",
     "github",
+    "github-issues",
     "triage",
+    "feedback-widget",
+    "runtime-monitoring",
+    "coding-agents",
     "widget",
     "sdk",
     "web"
@@ -23,6 +29,7 @@
     "url": "https://github.com/uDeserve/SignalForge.git",
     "directory": "packages/adapter"
   },
+  "homepage": "https://github.com/uDeserve/SignalForge/tree/main/packages/adapter",
   "publishConfig": {
     "access": "public"
   },

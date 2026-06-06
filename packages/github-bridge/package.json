@@ -2,7 +2,15 @@
   "name": "@signalforge/github-bridge",
   "private": true,
   "version": "0.1.0",
+  "description": "GitHub publication bridge for SignalForge decision-ready cases.",
   "type": "module",
+  "keywords": [
+    "signalforge",
+    "github",
+    "github-issues",
+    "github-app",
+    "issue-automation"
+  ],
   "scripts": {
     "build": "node -e \"console.log('github-bridge build placeholder')\"",
     "lint": "node -e \"console.log('github-bridge lint placeholder')\"",

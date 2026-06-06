@@ -2,7 +2,15 @@
   "name": "@signalforge/mcp-server",
   "private": true,
   "version": "0.1.0",
+  "description": "MCP server surface for querying SignalForge cases and automation context.",
   "type": "module",
+  "keywords": [
+    "signalforge",
+    "mcp",
+    "model-context-protocol",
+    "coding-agents",
+    "developer-tools"
+  ],
   "scripts": {
     "build": "node -e \"console.log('mcp-server build placeholder')\"",
     "lint": "node -e \"console.log('mcp-server lint placeholder')\"",

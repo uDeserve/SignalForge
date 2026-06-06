@@ -2,7 +2,16 @@
   "name": "@signalforge/api",
   "private": true,
   "version": "0.1.0",
+  "description": "SignalForge API for aggregating noisy user feedback into decision-ready GitHub issues.",
   "type": "module",
+  "keywords": [
+    "signalforge",
+    "feedback-to-issue",
+    "case-intelligence",
+    "triage",
+    "github-issues",
+    "api"
+  ],
   "scripts": {
     "dev": "node src/index.js",
     "build": "node -e \"console.log('api build placeholder')\"",

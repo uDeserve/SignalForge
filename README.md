@@ -1,16 +1,18 @@
 # SignalForge
 
 <p align="center">
-  <strong>Feedback ops for small web teams shipping on GitHub.</strong>
+  <strong>The missing harness between user reality and AI-native software automation.</strong>
 </p>
 
 <p align="center">
-  Plug into an existing web app, turn noisy feedback into decision-ready cases, and let a GitHub App handle the issue loop.
+  Modern automation already handles <em>issue -> code -> PR -> review</em>. SignalForge fills the missing upstream step: turning noisy user feedback and runtime pain into decision-ready GitHub issues that agents and engineering systems can actually execute on.
 </p>
 
 <p align="center">
-  <a href="./docs/vision.md"><img alt="Fast web app integration" src="https://img.shields.io/badge/fast%20integration-existing%20web%20apps-0F172A?style=flat-square&labelColor=EAF0F8" /></a>
+  <a href="./docs/vision.md"><img alt="AI-native harness layer" src="https://img.shields.io/badge/AI--native-harness%20layer-111827?style=flat-square&labelColor=EEF2FF" /></a>
+  <a href="./docs/quick-start.md"><img alt="Fast integration for existing apps" src="https://img.shields.io/badge/existing%20web%20apps-fast%20integration-0F172A?style=flat-square&labelColor=EAF0F8" /></a>
   <a href="./docs/github-app-setup.md"><img alt="GitHub App workflow" src="https://img.shields.io/badge/GitHub%20App-bring%20the%20bot%20in-0B3B66?style=flat-square&labelColor=EDF7FF" /></a>
+  <a href="./AGENT_README.md"><img alt="Agent-friendly integration" src="https://img.shields.io/badge/agents-first--class%20install%20path-1D4ED8?style=flat-square&labelColor=EFF6FF" /></a>
   <a href="./docs/live-e2e.md"><img alt="Live workflow verified" src="https://img.shields.io/badge/live%20workflow-verified-065F46?style=flat-square&labelColor=ECFDF3" /></a>
 </p>
 
@@ -23,13 +25,27 @@
   <a href="./docs/live-e2e.md">Live E2E</a>
 </p>
 
-SignalForge is built for small web application teams and independent developers who already have users, already use GitHub, and do not want to build a full internal feedback ops stack.
+SignalForge is built for small web application teams and independent developers who already have users, already ship on GitHub, and increasingly want AI systems to participate in the whole software loop.
 
-The product goal is simple:
+If code generation, PR drafting, code review, and issue execution are already becoming automatable, the bottleneck shifts upstream. Most teams still have no reliable bridge from raw user pain to machine-actionable engineering intent.
+
+SignalForge is that bridge.
+
+It turns user pain, runtime friction, and product ambiguity into evidence-backed cases that are clean enough for GitHub workflows, maintainers, and coding agents to act on with confidence.
+
+SignalForge can also be understood as:
+
+- an AI-native feedback-to-issue harness
+- a GitHub-native case intelligence layer
+- an upstream issue generation layer for coding-agent workflows
+- a user feedback aggregation system for modern web products
+
+The product goal is still operationally simple:
 
 - connect to an existing web app fast
 - keep setup close to one-click where possible
 - let a GitHub App handle publication and maintainer workflow with minimal operator friction
+- expose enough structure that a coding agent can install and use it correctly with very little guesswork
 
 Small-team repo-local path:
 
@@ -55,13 +71,88 @@ Agent-friendly setup contract:
 
 > Plug in fast. Publish cleanly. Keep the decision loop in GitHub.
 
+## Why SignalForge Exists
+
+The software loop is being automated from the middle outward.
+
+Teams already have serious momentum around:
+
+- issue-driven coding agents
+- automated PR generation
+- AI-assisted code review
+- GitHub-native execution workflows
+
+But those systems still depend on one fragile assumption:
+
+that a high-quality issue already exists.
+
+In practice, that assumption fails constantly. The real input is messy:
+
+- confused user feedback
+- repeated complaints with different wording
+- support conversations with partial context
+- runtime failures that never become coherent product work
+
+SignalForge exists to make that upstream layer usable.
+
+The ambition is not to become another inbox.
+
+The ambition is to become the feedback harness that makes the rest of the software automation chain meaningfully more effective.
+
+If someone is searching for tooling around AI-native feedback triage, GitHub issue automation, user feedback aggregation, or case intelligence for coding agents, this is the category SignalForge is built for.
+
+## The Missing Layer In The AI-Native Stack
+
+Most AI-native engineering stacks are getting strong at the downstream half:
+
+- GitHub issue intake
+- code generation
+- PR creation
+- review automation
+- execution harnesses
+
+What is still weak is the upstream half:
+
+- messy user complaints
+- vague support threads
+- repeated "something feels broken" reports
+- runtime pain disconnected from product context
+
+SignalForge sits exactly in that gap.
+
+It turns user reality into a smaller number of structured, evidence-backed cases so the rest of the automation stack has something clean to act on.
+
+```text
+user feedback + runtime pain
+-> SignalForge intake and aggregation
+-> decision-ready case
+-> GitHub issue
+-> coding agent / maintainer workflow
+-> shipped fix
+```
+
 | Integrate | Publish | Operate |
 | --- | --- | --- |
 | Add SignalForge to an existing web app through the adapter, widget, or direct API without reshaping the product stack. | Aggregate repeated reports into one case, then publish only when policy says the issue is ready. | Install the GitHub App, bring the bot into the repo, and keep maintainer actions inside the normal GitHub workflow. |
 
+## Why This Category Matters
+
+If the feedback-to-issue layer is weak, the entire AI-native delivery chain downstream becomes brittle.
+
+A coding agent can fix a well-scoped issue.
+
+It cannot reliably rescue a chaotic stream of raw user complaints unless something upstream performs:
+
+- aggregation
+- normalization
+- evidence synthesis
+- policy-gated publication
+
+That is the category SignalForge is trying to define clearly: not helpdesk software, not generic issue tracking, but the harness that converts product reality into automation-ready engineering objects.
+
 ## Why Teams Adopt It
 
-Most small product teams already have enough incoming signal.
+Most small product teams already have enough signal.
 
 What they usually lack is a lightweight way to turn that signal into clear engineering action without:
 
@@ -70,6 +161,8 @@ What they usually lack is a lightweight way to turn that signal into clear engin
 - forcing engineers into another dashboard
 
 SignalForge is meant to close that gap.
+
+The bigger bet is that this becomes foundational infrastructure for AI-native product teams: not another dashboard, but the feedback harness that feeds the rest of the software automation chain.
 
 ## Core Experience
 
@@ -109,6 +202,19 @@ It is:
 - let maintainers act through comments and normal GitHub review habits
 
 That is the model we want to make production-ready and boring in the best way.
+
+### 4. Agent-Friendly By Design
+
+SignalForge is also designed for the way modern teams actually work now: a human or operator often pastes a repo URL into Codex or another agent and expects the system to wire things up correctly.
+
+That is why the repo includes:
+
+- machine-readable integration contracts
+- scaffold commands for common integration presets
+- a dedicated `AGENT_README.md`
+- repo-local verification commands instead of hand-wavy setup prose
+
+If a product claims to be AI-native infrastructure, it should be installable not only by a careful human operator, but also by an agent working from repo context and a short instruction.
 
 ## What It Does
 
@@ -212,8 +318,13 @@ That means:
 - issue creation is not the same as engineering approval
 - maintainers should make one real decision in GitHub, not in a second admin system
 
+The point is not to make the feedback layer louder.
+
+The point is to make the upstream automation boundary finally trustworthy.
+
 ## What SignalForge Is
 
+- the intake and aggregation layer for AI-native software delivery
 - a lightweight feedback ops layer for existing web apps
 - a GitHub-native case aggregation engine
 - a bot-friendly issue publication and decision loop
@@ -255,6 +366,26 @@ Recommended layering:
 
 - Sentry or GlitchTip for runtime collection
 - SignalForge for aggregation, case correlation, publication, and orchestration
+
+## Why Now
+
+The industry is rapidly getting good at automating work after a good issue already exists.
+
+The unresolved problem is how to create that good issue from noisy reality, repeatedly, safely, and with enough structure that agents can keep going.
+
+That is the layer SignalForge is trying to make real.
+
+## Built For Small Teams
+
+SignalForge is deliberately shaped for the teams that feel this gap most sharply:
+
+- startups with one main web product
+- indie developers shipping fast on GitHub
+- small product teams that want AI leverage without building a full internal ops stack first
+
+Those teams do not need a giant platform.
+
+They need fast integration, a GitHub-native workflow, and a system that starts converting feedback into better engineering inputs immediately.
 
 ## Docs
 

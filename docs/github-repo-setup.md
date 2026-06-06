@@ -10,12 +10,13 @@ make the repo feel immediately clear, premium, and product-shaped to the right a
 
 Recommended:
 
-`Turn user feedback into decision-ready GitHub issues.`
+`AI-native feedback-to-issue harness for turning user feedback into decision-ready GitHub issues.`
 
 Alternates:
 
 - `Aggregate noisy feedback into decision-ready cases and GitHub issues.`
-- `A GitHub-native feedback-to-issue engine for product teams.`
+- `A GitHub-native feedback-to-issue engine for AI-native product teams.`
+- `Turn noisy user feedback and runtime pain into decision-ready GitHub issues.`
 
 ## Website
 
@@ -49,25 +50,27 @@ Use a tight topic set. Do not spam categories.
 
 Recommended topics:
 
-- `github`
-- `feedback`
-- `triage`
-- `issue-tracking`
-- `developer-tools`
+- `ai-native`
+- `feedback-to-issue`
+- `github-app`
+- `github-issues`
 - `product-feedback`
-- `llm`
+- `user-feedback`
+- `triage`
+- `issue-automation`
+- `developer-tools`
 - `automation`
-- `open-source`
+- `coding-agents`
 
 ## Pinned Repo Summary
 
 Recommended:
 
-`SignalForge is a GitHub-native case intelligence layer for product teams. It turns noisy feedback and runtime signals into aggregated cases, then publishes decision-ready issues when policy allows.`
+`SignalForge is a GitHub-native case intelligence layer for AI-native product teams. It turns noisy feedback and runtime signals into aggregated cases, then publishes decision-ready issues when policy allows.`
 
 Shorter version:
 
-`Aggregate noisy product signals into decision-ready GitHub issues.`
+`Aggregate noisy product signals into decision-ready GitHub issues for humans and coding agents.`
 
 ## First Impression Checklist
 
@@ -91,4 +94,4 @@ If you want the repo to feel even more polished:
 
 Recommended replacement for the current description:
 
-`Turn user feedback into decision-ready GitHub issues.`
+`AI-native feedback-to-issue harness that turns user feedback and runtime pain into decision-ready GitHub issues.`

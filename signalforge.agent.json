@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "product": "SignalForge",
-  "description": "Feedback ops layer for existing web apps with GitHub-native issue publication and decision sync.",
+  "description": "AI-native feedback-to-issue harness for existing web apps with GitHub-native issue publication, decision sync, and coding-agent-friendly setup.",
   "audience": [
     "small_web_team",
     "indie_developer",

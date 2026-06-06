@@ -2,8 +2,30 @@
   "name": "signalforge",
   "private": true,
   "version": "0.1.0",
-  "description": "Turn user feedback into decision-ready GitHub issues.",
+  "description": "AI-native feedback-to-issue harness that turns user feedback and runtime pain into decision-ready GitHub issues.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/uDeserve/SignalForge.git"
+  },
+  "homepage": "https://github.com/uDeserve/SignalForge",
+  "bugs": {
+    "url": "https://github.com/uDeserve/SignalForge/issues"
+  },
+  "keywords": [
+    "ai-native",
+    "feedback-to-issue",
+    "case-intelligence",
+    "github-issues",
+    "github-app",
+    "product-feedback",
+    "user-feedback",
+    "triage",
+    "issue-automation",
+    "coding-agents",
+    "developer-tools",
+    "web-app"
+  ],
   "packageManager": "npm@10.9.7",
   "workspaces": [
     "apps/*",

@@ -2,7 +2,16 @@
   "name": "@signalforge/triage",
   "private": true,
   "version": "0.1.0",
+  "description": "Aggregation-aware feedback triage and case synthesis for SignalForge.",
   "type": "module",
+  "keywords": [
+    "signalforge",
+    "triage",
+    "feedback-to-issue",
+    "case-intelligence",
+    "clustering",
+    "llm"
+  ],
   "scripts": {
     "build": "node -e \"console.log('triage build placeholder')\"",
     "lint": "node -e \"console.log('triage lint placeholder')\"",
