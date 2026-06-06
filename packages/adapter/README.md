@@ -49,6 +49,54 @@ sf.mountFeedbackWidget(document.getElementById('sf-feedback-root'), {
 });
 ```
 
+## Small-Team Fast Path
+
+For teams that want the shortest browser-side setup, use the one-call installer:
+
+```js
+import { installSignalForgeBrowser } from '@signalforge/adapter';
+
+const sf = installSignalForgeBrowser({
+  endpoint: 'https://signalforge.example.com',
+  projectKey: 'proj_readerapp',
+  appName: 'readerapp',
+  environment: 'production',
+  release: '1.2.3',
+  feedback: {
+    selector: '#sf-feedback-root',
+    includeContactField: true,
+    defaultOpen: false,
+  },
+});
+```
+
+This path is meant for small teams that want:
+
+- global browser error capture
+- a mounted feedback widget
+- a short installation path without hand-wiring every piece
+
+If you want the shortest possible preset, use:
+
+```js
+import { installSignalForgePreset } from '@signalforge/adapter';
+
+installSignalForgePreset({
+  endpoint: 'https://signalforge.example.com',
+  projectKey: 'proj_readerapp',
+  appName: 'readerapp',
+  environment: 'production',
+  release: '1.2.3',
+});
+```
+
+With this preset, SignalForge will:
+
+- look for `#sf-feedback-root`
+- mount the feedback widget there
+- install browser global error capture
+- send feedback and runtime events to the configured endpoint
+
 ## Recommended Runtime Setup
 
 SignalForge should not replace a mature error collection provider.
@@ -63,6 +111,8 @@ Recommended layering:
 
 - `createSignalForgeAdapter`
 - `installSignalForge`
+- `installSignalForgeBrowser`
+- `installSignalForgePreset`
 - `captureError`
 - `linkSentry`
 - `linkGlitchTip`

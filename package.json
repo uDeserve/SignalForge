@@ -10,6 +10,9 @@
     "packages/*"
   ],
   "scripts": {
+    "sf:init": "node scripts/signalforge_cli.mjs init",
+    "sf:doctor": "node scripts/signalforge_cli.mjs doctor",
+    "sf:start": "node scripts/signalforge_cli.mjs start",
     "dev": "node apps/api/src/index.js",
     "build": "node -e \"console.log('build placeholder')\"",
     "lint": "node -e \"console.log('lint placeholder')\"",

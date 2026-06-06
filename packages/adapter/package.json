@@ -1,9 +1,31 @@
 {
   "name": "@signalforge/adapter",
-  "private": true,
   "version": "0.1.0",
+  "description": "Drop-in feedback and runtime adapter for existing web apps using SignalForge.",
+  "license": "MIT",
   "type": "module",
   "exports": "./src/index.js",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "keywords": [
+    "signalforge",
+    "feedback",
+    "github",
+    "triage",
+    "widget",
+    "sdk",
+    "web"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/uDeserve/SignalForge.git",
+    "directory": "packages/adapter"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "node -e \"console.log('adapter build placeholder')\"",
     "lint": "node -e \"console.log('adapter lint placeholder')\"",

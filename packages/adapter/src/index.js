@@ -12,6 +12,22 @@ function getDefaultDocument(root, documentImpl) {
   return documentImpl ?? root?.ownerDocument ?? globalThis.document ?? null;
 }
 
+function resolveMountRoot(root, { documentImpl, target = globalThis } = {}) {
+  if (!root) return null;
+  if (typeof root !== 'string') return root;
+  const resolvedDocument = documentImpl ?? target?.document ?? globalThis.document ?? null;
+  if (!resolvedDocument?.querySelector) {
+    throw new Error('document with querySelector is required when feedback root is a selector');
+  }
+  return resolvedDocument.querySelector(root);
+}
+
+function normalizeFeedbackInstallOptions(feedback) {
+  if (feedback === true) return { selector: '#sf-feedback-root' };
+  if (typeof feedback === 'string') return { selector: feedback };
+  return feedback;
+}
+
 function getCurrentRoute({ route, routeResolver, target = globalThis } = {}) {
   if (route) return route;
   if (typeof routeResolver === 'function') {
@@ -611,4 +627,100 @@ export function wrapErrorBoundary({ onError, capture } = {}) {
 
 export function createSignalForgeAdapter(options = {}) {
   return installSignalForge(options);
+}
+
+export function installSignalForgeBrowser({
+  endpoint,
+  projectKey,
+  appName = 'app',
+  environment = 'development',
+  release = '',
+  routeResolver,
+  target = globalThis,
+  fetchImpl = fetch,
+  captureGlobalErrors = true,
+  globalErrorOptions = {},
+  feedback = null,
+} = {}) {
+  const adapter = createSignalForgeAdapter({
+    endpoint,
+    projectKey,
+    appName,
+    environment,
+    release,
+    routeResolver,
+    target,
+    fetchImpl,
+  });
+
+  let widget = null;
+  let uninstallGlobalErrorHandlers = null;
+
+  if (captureGlobalErrors) {
+    uninstallGlobalErrorHandlers = adapter.installGlobalErrorHandlers({
+      ...globalErrorOptions,
+      eventTarget: globalErrorOptions.eventTarget ?? target,
+    });
+  }
+
+  if (feedback) {
+    const normalizedFeedback = normalizeFeedbackInstallOptions(feedback);
+    const {
+      root,
+      selector,
+      document: documentImpl,
+      ...widgetOptions
+    } = normalizedFeedback;
+    const feedbackRoot = resolveMountRoot(root ?? selector, {
+      documentImpl,
+      target,
+    });
+    if (!feedbackRoot) {
+      throw new Error('feedback root element is required for installSignalForgeBrowser');
+    }
+    widget = adapter.mountFeedbackWidget(feedbackRoot, {
+      ...widgetOptions,
+      document: documentImpl,
+    });
+  }
+
+  return {
+    adapter,
+    widget,
+    uninstallGlobalErrorHandlers,
+    destroy() {
+      uninstallGlobalErrorHandlers?.();
+      widget?.destroy?.();
+    },
+  };
+}
+
+export function installSignalForgePreset({
+  endpoint,
+  projectKey,
+  appName = 'app',
+  environment = 'development',
+  release = '',
+  feedbackRoot = '#sf-feedback-root',
+  feedback = true,
+  routeResolver,
+  target = globalThis,
+  fetchImpl = fetch,
+} = {}) {
+  return installSignalForgeBrowser({
+    endpoint,
+    projectKey,
+    appName,
+    environment,
+    release,
+    routeResolver,
+    target,
+    fetchImpl,
+    feedback:
+      feedback === false
+        ? null
+        : typeof feedback === 'object'
+          ? { selector: feedbackRoot, ...feedback }
+          : feedbackRoot,
+  });
 }

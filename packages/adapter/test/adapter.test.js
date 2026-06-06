@@ -4,6 +4,8 @@ import {
   captureError,
   createSignalForgeAdapter,
   createSignalForgeContext,
+  installSignalForgeBrowser,
+  installSignalForgePreset,
   linkSentry,
   mountFeedbackWidget,
 } from '../src/index.js';
@@ -64,8 +66,21 @@ class FakeElement {
 }
 
 class FakeDocument {
+  constructor() {
+    this.nodesBySelector = new Map();
+  }
+
   createElement(tagName) {
     return new FakeElement(tagName, this);
+  }
+
+  querySelector(selector) {
+    return this.nodesBySelector.get(selector) ?? null;
+  }
+
+  registerSelector(selector, element) {
+    this.nodesBySelector.set(selector, element);
+    return element;
   }
 }
 
@@ -222,4 +237,93 @@ test('feedback widget submits through the adapter', async () => {
   assert.equal(submissions[0].appContext.route, '/reader/7');
   assert.equal(widget.elements.status.textContent, 'Thanks for the report.');
   assert.equal(widget.elements.panel.hidden, true);
+});
+
+test('installSignalForgeBrowser sets up widget and global handlers through one call', async () => {
+  const document = new FakeDocument();
+  const root = document.registerSelector('#sf-root', new FakeElement('div', document));
+  const eventTarget = new FakeEventTarget();
+  const calls = [];
+
+  const fetchImpl = async (url, init) => {
+    calls.push({ url, init: JSON.parse(init.body) });
+    return {
+      ok: true,
+      json: async () => ({ ok: true }),
+    };
+  };
+
+  const installation = installSignalForgeBrowser({
+    endpoint: 'https://sf.example.com',
+    projectKey: 'proj_1',
+    appName: 'readerapp',
+    environment: 'production',
+    release: '1.0.0',
+    fetchImpl,
+    target: {
+      document,
+      location: { pathname: '/reader/1', search: '', hash: '' },
+      addEventListener: eventTarget.addEventListener.bind(eventTarget),
+      removeEventListener: eventTarget.removeEventListener.bind(eventTarget),
+    },
+    globalErrorOptions: {
+      eventTarget,
+    },
+    feedback: {
+      selector: '#sf-root',
+      document,
+      defaultOpen: true,
+    },
+  });
+
+  installation.widget.elements.bodyInput.value = 'Feedback from quick install flow.';
+  await installation.widget.submit();
+  await eventTarget.dispatch('error', { error: new Error('browser boom'), filename: '/reader/1' });
+
+  assert.equal(Boolean(installation.widget), true);
+  assert.equal(typeof installation.uninstallGlobalErrorHandlers, 'function');
+  assert.equal(calls.length, 2);
+  assert.match(calls[0].url, /\/submissions$/);
+  assert.match(calls[1].url, /\/runtime-events$/);
+
+  installation.destroy();
+});
+
+test('installSignalForgePreset supports a minimal small-team browser install shape', async () => {
+  const document = new FakeDocument();
+  document.registerSelector('#sf-feedback-root', new FakeElement('div', document));
+  const eventTarget = new FakeEventTarget();
+  const calls = [];
+
+  const fetchImpl = async (url, init) => {
+    calls.push({ url, init: JSON.parse(init.body) });
+    return {
+      ok: true,
+      json: async () => ({ ok: true }),
+    };
+  };
+
+  const installation = installSignalForgePreset({
+    endpoint: 'https://sf.example.com',
+    projectKey: 'proj_1',
+    appName: 'readerapp',
+    environment: 'production',
+    release: '1.0.0',
+    fetchImpl,
+    target: {
+      document,
+      location: { pathname: '/reader/preset', search: '', hash: '' },
+      addEventListener: eventTarget.addEventListener.bind(eventTarget),
+      removeEventListener: eventTarget.removeEventListener.bind(eventTarget),
+    },
+  });
+
+  installation.widget.elements.bodyInput.value = 'Preset install feedback';
+  await installation.widget.submit();
+
+  assert.equal(Boolean(installation.widget), true);
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].url, /\/submissions$/);
+
+  installation.destroy();
 });

@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "product": "SignalForge",
+  "description": "Feedback ops layer for existing web apps with GitHub-native issue publication and decision sync.",
+  "audience": [
+    "small_web_team",
+    "indie_developer",
+    "coding_agent"
+  ],
+  "adoptionPriority": [
+    "fast_existing_web_app_integration",
+    "near_one_click_operator_flow",
+    "github_app_bot_workflow"
+  ],
+  "repoLocalCommands": {
+    "init": "npm run sf:init",
+    "doctor": "npm run sf:doctor",
+    "start": "npm run sf:start",
+    "previewVerification": "node scripts/run_readerapp_feedback_sample.mjs",
+    "githubAppVerification": "node scripts/run_github_app_publish_e2e.mjs"
+  },
+  "frontendIntegration": {
+    "recommendedPackage": "@signalforge/adapter",
+    "recommendedExport": "installSignalForgePreset",
+    "requiredDomSelector": "#sf-feedback-root",
+    "minimalExample": [
+      "import { installSignalForgePreset } from '@signalforge/adapter';",
+      "",
+      "installSignalForgePreset({",
+      "  endpoint: 'https://signalforge.example.com',",
+      "  projectKey: 'proj_readerapp',",
+      "  appName: 'readerapp',",
+      "  environment: 'production',",
+      "  release: '1.2.3',",
+      "});"
+    ]
+  },
+  "installModes": [
+    {
+      "id": "repo_local_preview",
+      "purpose": "fastest local validation path",
+      "requiredEnv": [
+        "GITHUB_PUBLISHER"
+      ],
+      "defaults": {
+        "GITHUB_PUBLISHER": "preview"
+      },
+      "verificationCommand": "node scripts/run_readerapp_feedback_sample.mjs"
+    },
+    {
+      "id": "github_app_trial",
+      "purpose": "bot-style GitHub workflow validation",
+      "requiredEnv": [
+        "GITHUB_PUBLISHER",
+        "GITHUB_APP_INSTALLATION_ID"
+      ],
+      "oneOfEnvSets": [
+        [
+          "GITHUB_APP_INSTALLATION_TOKEN"
+        ],
+        [
+          "GITHUB_APP_ID",
+          "GITHUB_APP_PRIVATE_KEY",
+          "GITHUB_APP_INSTALLATION_ID"
+        ]
+      ],
+      "recommendedEnv": [
+        "SIGNALFORGE_E2E_REPO",
+        "GITHUB_WEBHOOK_SECRET"
+      ],
+      "defaults": {
+        "GITHUB_PUBLISHER": "app",
+        "SIGNALFORGE_E2E_REPO": "uDeserve/signalforge-e2e-lab"
+      },
+      "verificationCommand": "node scripts/run_github_app_publish_e2e.mjs"
+    }
+  ],
+  "docs": {
+    "agentReadme": "AGENT_README.md",
+    "quickStart": "docs/quick-start.md",
+    "githubAppSetup": "docs/github-app-setup.md",
+    "architecture": "docs/architecture.md",
+    "apiContract": "docs/api-contract.md"
+  },
+  "agentAssets": {
+    "setupContract": "signalforge.agent.json",
+    "integrationContract": "signalforge.integration.json",
+    "doctorJsonCommand": "node scripts/signalforge_cli.mjs doctor --json",
+    "manifestCommand": "node scripts/signalforge_cli.mjs manifest",
+    "integrationCommand": "node scripts/signalforge_cli.mjs integration",
+    "scaffoldCommand": "node scripts/signalforge_cli.mjs scaffold browser-preset --json"
+  }
+}

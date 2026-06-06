@@ -1,15 +1,39 @@
 # GitHub App Setup
 
-This document explains how to run SignalForge with the GitHub App publisher.
+This document explains the intended mature GitHub App experience for SignalForge.
 
-## Goal
+The target operator experience is straightforward:
 
-Use GitHub App auth instead of a personal token for issue publication.
+- install the app
+- bring the bot into the repository
+- configure once
+- let SignalForge publish issues and sync decisions through GitHub
 
-SignalForge supports two GitHub App paths:
+For small teams, this should feel much closer to "turn it on" than "assemble an integration project."
 
-- static installation token for controlled testing
-- full JWT -> installation token exchange for production-like validation
+## What The GitHub App Is For
+
+Use the GitHub App path when you want SignalForge to behave like a real product integration instead of a personal-token script.
+
+The GitHub App is the right long-term model because it gives:
+
+- repository-scoped installation
+- cleaner auth boundaries
+- bot-style operation in the repo
+- a more mature issue publication path
+- a natural webhook-driven decision loop
+
+## Recommended Operator Flow
+
+For the intended production-like path:
+
+1. deploy or run SignalForge behind HTTPS
+2. install the GitHub App into the target repository
+3. grant the required repository permissions
+4. configure the SignalForge env once
+5. let feedback flow into cases and let the bot publish issues
+
+After that, maintainers should mostly operate inside GitHub.
 
 ## Minimum Permissions
 
@@ -25,19 +49,21 @@ For webhook-driven decision sync, also enable:
   - `Issues`
   - `Issue comment`
 
-## Recommended Test Repo
+## Recommended First Installation Target
 
-Use a dedicated repo first, for example:
+Use a dedicated repository first, for example:
 
 - `uDeserve/signalforge-e2e-lab`
 
-Do not start on the main project repo.
+Validate the workflow there before moving into a higher-signal production repo.
 
-## Required Env
+## Supported App Auth Modes
+
+SignalForge currently supports two GitHub App paths.
 
 ### Option A: Static installation token
 
-Use this when you already have an installation token and only want to validate the publisher boundary.
+Use this when you already have an installation token and want the fastest possible validation loop.
 
 ```bash
 GITHUB_PUBLISHER=app
@@ -48,7 +74,7 @@ SIGNALFORGE_E2E_REPO=uDeserve/signalforge-e2e-lab
 
 ### Option B: Full GitHub App auth
 
-Use this for the intended production-like path.
+Use this for the intended mature path.
 
 ```bash
 GITHUB_PUBLISHER=app
@@ -58,7 +84,7 @@ GITHUB_APP_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY--
 SIGNALFORGE_E2E_REPO=uDeserve/signalforge-e2e-lab
 ```
 
-## E2E Command
+## Fast Verification Command
 
 Run:
 
@@ -77,24 +103,36 @@ Expected result:
   - issue number
   - issue URL
 
+## Bot Workflow Expectation
+
+The mature workflow is not just "create issue."
+
+It should also support the maintainer loop:
+
+- the bot publishes the issue
+- maintainers respond inside GitHub
+- SignalForge receives the webhook
+- the case state updates without operators jumping into another tool
+
+That is the real product behavior we are optimizing for.
+
 ## Webhook URL
 
 For the current webhook service:
 
 - `POST /webhooks/github`
 
-If running locally, expose the GitHub app listener through a tunnel before registering it with GitHub.
+If running locally, expose the listener through a tunnel before registering it with GitHub.
 
-## Current Boundary
-
-What is already implemented:
+## What Is Already Implemented
 
 - GitHub App publisher interface
 - JWT signing
 - installation token exchange
 - issue publication through installation token
+- webhook-driven owner decision sync
 
-What has now been externally validated:
+## What Has Been Externally Validated
 
 - actual GitHub App credentials
 - actual installation on a repo
@@ -102,19 +140,16 @@ What has now been externally validated:
 - actual webhook delivery from GitHub to SignalForge
 - actual owner decision sync through issue comments
 
-## Verified Production-Like Flow
+## Mature Product Direction
 
-The following path has been confirmed against a live deployment:
+The standard we should keep pushing toward is:
 
-```text
-SignalForge case
--> GitHub App publisher
--> real GitHub issue
--> maintainer comment command
--> GitHub webhook
--> SignalForge decision record
--> case status update
-```
+- install the app
+- add it to the repo
+- configure once
+- use SignalForge without ongoing auth babysitting
+
+That is what will feel credible to small teams and independent developers.
 
 ## Common Failure Mode
 

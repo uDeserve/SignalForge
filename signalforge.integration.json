@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "product": "SignalForge",
+  "integrationTarget": "existing_web_app",
+  "recommendedPackage": "@signalforge/adapter",
+  "recommendedExport": "installSignalForgePreset",
+  "integrationModes": [
+    {
+      "id": "browser_preset",
+      "recommended": true,
+      "purpose": "shortest path for small teams",
+      "package": "@signalforge/adapter",
+      "export": "installSignalForgePreset",
+      "codeStyle": "esm",
+      "requiredConfig": [
+        "endpoint",
+        "projectKey",
+        "appName",
+        "environment",
+        "release"
+      ],
+      "requiredDom": [
+        {
+          "selector": "#sf-feedback-root",
+          "kind": "mount_root",
+          "required": true
+        }
+      ],
+      "insertions": [
+        {
+          "kind": "import",
+          "code": "import { installSignalForgePreset } from '@signalforge/adapter';"
+        },
+        {
+          "kind": "runtime_init",
+          "placement": "app bootstrap or client entrypoint",
+          "code": "installSignalForgePreset({\n  endpoint: 'https://signalforge.example.com',\n  projectKey: 'proj_readerapp',\n  appName: 'readerapp',\n  environment: 'production',\n  release: '1.2.3',\n});"
+        },
+        {
+          "kind": "dom_mount",
+          "placement": "application shell or page root",
+          "code": "<div id=\"sf-feedback-root\"></div>"
+        }
+      ],
+      "behavior": [
+        "mounts the feedback widget into #sf-feedback-root",
+        "installs global browser error capture",
+        "submits feedback to /submissions",
+        "submits runtime events to /runtime-events"
+      ],
+      "verification": {
+        "repoCommand": "node scripts/run_readerapp_feedback_sample.mjs",
+        "expected": [
+          "feedback reaches SignalForge",
+          "cases are created or merged",
+          "the inbox is reviewable through the API"
+        ]
+      }
+    },
+    {
+      "id": "browser_custom",
+      "recommended": false,
+      "purpose": "more control for teams that want explicit wiring",
+      "package": "@signalforge/adapter",
+      "export": "createSignalForgeAdapter",
+      "codeStyle": "esm",
+      "requiredConfig": [
+        "endpoint",
+        "projectKey",
+        "appName",
+        "environment",
+        "release"
+      ],
+      "insertions": [
+        {
+          "kind": "import",
+          "code": "import { createSignalForgeAdapter } from '@signalforge/adapter';"
+        },
+        {
+          "kind": "runtime_init",
+          "placement": "app bootstrap or client entrypoint",
+          "code": "const sf = createSignalForgeAdapter({\n  endpoint: 'https://signalforge.example.com',\n  projectKey: 'proj_readerapp',\n  appName: 'readerapp',\n  environment: 'production',\n  release: '1.2.3',\n});\n\nsf.installGlobalErrorHandlers();"
+        }
+      ]
+    }
+  ],
+  "agentGuidance": {
+    "preferMode": "browser_preset",
+    "doNotAssumeHostedService": true,
+    "readBeforePatch": [
+      "signalforge.agent.json",
+      "AGENT_README.md",
+      "docs/quick-start.md"
+    ],
+    "scaffoldCommands": [
+      "node scripts/signalforge_cli.mjs scaffold browser-preset --json",
+      "node scripts/signalforge_cli.mjs scaffold react-preset --json"
+    ],
+    "verifyAfterPatch": [
+      "npm run sf:doctor",
+      "node scripts/run_readerapp_feedback_sample.mjs"
+    ],
+    "referenceTemplates": [
+      "examples/agent/browser-preset/",
+      "examples/agent/react-preset/"
+    ]
+  }
+}
