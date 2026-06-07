@@ -37,6 +37,7 @@ function printUsage() {
 Usage:
   node scripts/signalforge_cli.mjs init
   node scripts/signalforge_cli.mjs doctor
+  node scripts/signalforge_cli.mjs verify
   node scripts/signalforge_cli.mjs integration
   node scripts/signalforge_cli.mjs manifest
   node scripts/signalforge_cli.mjs scaffold <template>
@@ -45,6 +46,7 @@ Usage:
 Commands:
   init    Create a local .env from .env.example when missing.
   doctor  Check whether this repo is ready for a small-team trial setup.
+  verify  Run a verification flow for setup, case creation, publication, and decision sync readiness.
   integration Print a machine-readable web-app integration contract.
   manifest Print a machine-readable setup contract for agents and automation.
   scaffold Emit or write an integration scaffold from the built-in agent templates.
@@ -323,6 +325,52 @@ function runStart() {
   });
 }
 
+async function runVerifyCommand(env) {
+  const { createSignalForgeApi } = await import('../apps/api/src/index.js');
+  const { createStore } = await import('../apps/api/src/store.js');
+  const { createTriageEngine } = await import('../packages/triage/src/index.js');
+  const { createDeepSeekSubmissionAnalyzer } = await import('../packages/triage/src/deepseek.js');
+  const { createGitHubPublisherFromEnv } = await import('../packages/github-bridge/src/index.js');
+
+  const triageEngine = env.DEEPSEEK_API_KEY
+    ? createTriageEngine({
+        logger: console,
+        submissionAnalyzer: createDeepSeekSubmissionAnalyzer({
+          apiKey: env.DEEPSEEK_API_KEY,
+          baseUrl: env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',
+          model: env.DEEPSEEK_MODEL || 'deepseek-v4-flash',
+        }),
+      })
+    : createTriageEngine({ logger: console });
+  const githubPublisher = createGitHubPublisherFromEnv(env);
+  const { handleRequest, store } = createSignalForgeApi({
+    store: createStore(':memory:'),
+    logger: console,
+    triageEngine,
+    githubPublisher,
+    env,
+    repoRoot,
+  });
+
+  try {
+    const response = await handleRequest({
+      method: 'POST',
+      url: '/verify/run',
+      body: {
+        target: {
+          repo: env.SIGNALFORGE_E2E_REPO,
+        },
+      },
+    });
+    if (response.error) {
+      throw new Error(response.error.message);
+    }
+    return response.body;
+  } finally {
+    store.close();
+  }
+}
+
 async function main() {
   const { command, json, outputDir, positional } = parseArgs();
   if (command === 'help' || command === '--help' || command === '-h') {
@@ -359,6 +407,36 @@ async function main() {
       return;
     }
     printDoctor(result);
+    return;
+  }
+  if (command === 'verify') {
+    const env = mergeEnv(loadEnv(envExamplePath), loadEnv(envPath), process.env, {
+      SIGNALFORGE_ENV_FILE: envPath,
+    });
+    const result = await runVerifyCommand(env);
+    if (json) {
+      console.log(JSON.stringify(result, null, 2));
+      return;
+    }
+    console.log('SignalForge Verify');
+    console.log('');
+    console.log(`Publisher mode: ${result.setup.publisherMode}`);
+    console.log(`Submission accepted: ${result.submission.accepted ? 'yes' : 'no'}`);
+    console.log(`Case created: ${result.triage.caseId}`);
+    console.log(`Case actionable: ${result.triage.actionable ? 'yes' : 'no'}`);
+    console.log(`Publish attempted: ${result.publish.attempted ? 'yes' : 'no'}`);
+    console.log(`Publish ok: ${result.publish.ok ? 'yes' : 'no'}`);
+    if (result.publish.repo) {
+      console.log(`Target repo: ${result.publish.repo}`);
+    }
+    if (result.publish.result?.url) {
+      console.log(`Published issue: ${result.publish.result.url}`);
+    }
+    if (result.publish.skippedReason) {
+      console.log(`Publish skipped: ${result.publish.skippedReason}`);
+    }
+    console.log(`Decision sync ready: ${result.decisionSync.ready ? 'yes' : 'no'}`);
+    console.log(`Next step: ${result.decisionSync.nextStep}`);
     return;
   }
   if (command === 'manifest') {

@@ -250,6 +250,29 @@ test('signalforge cli doctor supports machine-readable json output', async () =>
   assert.equal(Array.isArray(parsed.checks), true);
 });
 
+test('signalforge cli verify emits machine-readable verification output', async () => {
+  const fixture = createFixture();
+  fs.copyFileSync(envExample, path.join(fixture, '.env'));
+  const result = await runCli(['verify', '--json'], {
+    cwd: repoRoot,
+    env: {
+      SIGNALFORGE_ENV_FILE: path.join(fixture, '.env'),
+      SIGNALFORGE_ENV_EXAMPLE_FILE: path.join(fixture, '.env.example'),
+      GITHUB_PUBLISHER: 'preview',
+      SIGNALFORGE_E2E_REPO: 'uDeserve/signalforge-e2e-lab',
+    },
+  });
+
+  assert.equal(result.status, 0);
+  const parsed = JSON.parse(result.stdout);
+  assert.equal(parsed.schemaVersion, 1);
+  assert.equal(parsed.setup.publisherMode, 'preview');
+  assert.equal(parsed.submission.accepted, true);
+  assert.equal(typeof parsed.triage.caseId, 'string');
+  assert.equal(typeof parsed.publish.ok, 'boolean');
+  assert.equal(typeof parsed.decisionSync.nextStep, 'string');
+});
+
 test('signalforge cli manifest emits an agent-readable setup contract', async () => {
   const result = await runCli(['manifest'], { cwd: repoRoot });
   assert.equal(result.status, 0);

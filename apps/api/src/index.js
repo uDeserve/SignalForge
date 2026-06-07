@@ -101,7 +101,7 @@ function updateCaseAfterPolicy(caseRecord) {
   };
 }
 
-function buildSubmissionCaseRecord({ triaged, submission, existingCase, store }) {
+function buildSubmissionCaseRecord({ triaged, submission, existingCase, store, defaultSuggestedRepo }) {
   const now = new Date().toISOString();
   const submissionIds = dedupe([...(existingCase?.links?.submissionIds ?? []), submission.id]);
   const linkedSubmissions = store.listSubmissionsByIds(submissionIds);
@@ -162,7 +162,7 @@ function buildSubmissionCaseRecord({ triaged, submission, existingCase, store })
     decisionReadiness: {
       actionable: triaged.actionable,
       missingInfo: existingCase?.decisionReadiness?.missingInfo ?? [],
-      suggestedRepo: existingCase?.decisionReadiness?.suggestedRepo ?? 'org/repo',
+      suggestedRepo: existingCase?.decisionReadiness?.suggestedRepo ?? defaultSuggestedRepo,
       suggestedLabels: triaged.semantic?.suggestedLabels ?? existingCase?.decisionReadiness?.suggestedLabels ?? ['source:user-feedback'],
       suggestedPriority: triaged.scoring.severityScore >= 0.8 ? 'p1' : 'p2',
       suggestedOwner: existingCase?.decisionReadiness?.suggestedOwner ?? 'owner',
@@ -194,7 +194,7 @@ function buildSubmissionCaseRecord({ triaged, submission, existingCase, store })
   return updateCaseAfterPolicy(nextCase);
 }
 
-function createCaseRecordFromRuntimeEvent(event, triaged) {
+function createCaseRecordFromRuntimeEvent(event, triaged, defaultSuggestedRepo) {
   const now = new Date().toISOString();
   return updateCaseAfterPolicy(createCase({
     id: `case_${randomUUID()}`,
@@ -224,7 +224,7 @@ function createCaseRecordFromRuntimeEvent(event, triaged) {
     decisionReadiness: {
       actionable: triaged.actionable,
       missingInfo: [],
-      suggestedRepo: 'org/repo',
+      suggestedRepo: defaultSuggestedRepo,
       suggestedLabels: triaged.semantic?.suggestedLabels ?? ['source:runtime-signal'],
       suggestedPriority: triaged.scoring.severityScore >= 0.8 ? 'p1' : 'p2',
       suggestedOwner: 'owner',
@@ -313,6 +313,43 @@ function toInboxItem(caseRecord) {
   };
 }
 
+function buildVerifySubmissionPayload() {
+  return {
+    source: 'signalforge_verify',
+    reporter: {
+      id: 'signalforge_verify_user',
+    },
+    appContext: {
+      appName: 'readerapp',
+      environment: 'staging',
+      release: 'signalforge-verify',
+      route: '/reader/verify',
+      feature: 'signalforge_verify',
+      action: 'submit_feedback',
+      sourceType: 'verify_flow',
+      feedbackType: 'reader',
+    },
+    content: {
+      title: '[SignalForge Verify] Reader feedback should become a case',
+      body: 'This is a SignalForge verify submission. The reader popup blocks content and should become a case, then publish if GitHub is connected.',
+      categoryHint: 'feedback',
+      rating: 'bad',
+      sentimentHint: 'negative',
+      language: 'en',
+    },
+    evidence: {
+      reproduction: 'Open reader, tap a word, popup blocks content.',
+    },
+    privacy: {
+      containsPii: false,
+      redactionStatus: 'pending',
+    },
+    raw: {
+      source: 'signalforge_verify_flow',
+    },
+  };
+}
+
 export function createSignalForgeApi({
   store = createStore(),
   logger = console,
@@ -321,6 +358,8 @@ export function createSignalForgeApi({
   env = process.env,
   repoRoot = fileURLToPath(new URL('../../..', import.meta.url)),
 } = {}) {
+  const defaultSuggestedRepo = String(env.SIGNALFORGE_E2E_REPO ?? 'org/repo').trim() || 'org/repo';
+
   async function maybeAutoPublish(caseRecord) {
     if (
       !caseRecord.decisionReadiness?.actionable ||
@@ -362,7 +401,13 @@ export function createSignalForgeApi({
     return store.upsertCase(nextCase, nextCase.clustering.fingerprint);
   }
 
-  async function triageAndUpsertSubmission(submission) {
+  async function triageAndUpsertSubmission(
+    submission,
+    {
+      autoPublish = true,
+      defaultSuggestedRepoOverride = '',
+    } = {},
+  ) {
     const existingClusters = buildExistingClusterHints(store.listCases());
     const triaged = await triageEngine.triageSubmission(submission, {
       requestId: `triage_${submission.id}`,
@@ -375,9 +420,10 @@ export function createSignalForgeApi({
       submission,
       existingCase,
       store,
+      defaultSuggestedRepo: defaultSuggestedRepoOverride || defaultSuggestedRepo,
     });
     const storedCase = store.upsertCase(caseRecord, caseRecord.clustering.fingerprint);
-    return maybeAutoPublish(storedCase);
+    return autoPublish ? maybeAutoPublish(storedCase) : storedCase;
   }
 
   async function handleRuntimeEvent(event) {
@@ -389,8 +435,153 @@ export function createSignalForgeApi({
     const existingCase = triaged.fingerprint ? store.findCaseByFingerprint(triaged.fingerprint) : null;
     const storedCase = existingCase
       ? store.upsertCase(enrichCaseWithRuntimeEvent(existingCase, event), existingCase.clustering.fingerprint)
-      : store.upsertCase(createCaseRecordFromRuntimeEvent(event, triaged), triaged.fingerprint);
+      : store.upsertCase(createCaseRecordFromRuntimeEvent(event, triaged, defaultSuggestedRepo), triaged.fingerprint);
     return maybeAutoPublish(storedCase);
+  }
+
+  async function runVerification(target = {}) {
+    const setup = await evaluateSetupStatus({
+      env,
+      repoRoot,
+      fileSystem: fs,
+    });
+    const verifySubmission = buildVerifySubmissionPayload();
+    const submission = createSubmission({
+      id: `sub_${randomUUID()}`,
+      submittedAt: new Date().toISOString(),
+      source: verifySubmission.source,
+      reporter: verifySubmission.reporter,
+      appContext: verifySubmission.appContext,
+      content: verifySubmission.content,
+      evidence: verifySubmission.evidence,
+      privacy: verifySubmission.privacy,
+      raw: verifySubmission.raw,
+    });
+    store.saveSubmission(submission);
+    const storedCase = await triageAndUpsertSubmission(submission, {
+      autoPublish: false,
+      defaultSuggestedRepoOverride: target.repo ?? '',
+    });
+    const resolvedRepo =
+      target.repo ??
+      storedCase.decisionReadiness?.suggestedRepo ??
+      setup.githubAppConnection?.installation?.repo ??
+      setup.e2eRepo ??
+      'org/repo';
+
+    let publish = {
+      attempted: false,
+      ok: false,
+      repo: resolvedRepo,
+      skippedReason: '',
+      result: null,
+    };
+
+    if (storedCase.publication?.published) {
+      const publication = storedCase.publication?.primaryPublicationId
+        ? store.getPublication(storedCase.publication.primaryPublicationId)
+        : store.listPublications(storedCase.id)[0] ?? null;
+      publish = {
+        attempted: true,
+        ok: true,
+        repo: resolvedRepo,
+        skippedReason: '',
+        result: publication?.result ?? null,
+      };
+    } else if (
+      setup.publisherMode !== 'preview' &&
+      !setup.setupStages.publishTestReady
+    ) {
+      publish = {
+        attempted: false,
+        ok: false,
+        repo: resolvedRepo,
+        skippedReason: 'publish_not_ready',
+        result: null,
+      };
+    } else if (!storedCase.decisionReadiness?.actionable) {
+      publish = {
+        attempted: false,
+        ok: false,
+        repo: resolvedRepo,
+        skippedReason: 'case_not_actionable',
+        result: null,
+      };
+    } else {
+      try {
+        const published = await githubPublisher.publishCase({
+          caseRecord: storedCase,
+          repo: resolvedRepo,
+          mode: PublicationTarget.github_issue,
+          publicRepo: true,
+        });
+        const publication = createIssuePublication(storedCase, {
+          repo: published.repo,
+          mode: published.mode,
+          externalId: published.result.externalId,
+          url: published.result.url,
+          number: published.result.number,
+        });
+        const savedPublication = store.savePublication({
+          ...publication,
+          snapshot: published.snapshot,
+        });
+        store.upsertCase({
+          ...storedCase,
+          status: CaseStatus.published,
+          publication: {
+            ...storedCase.publication,
+            published: true,
+            target: publication.target.mode,
+            primaryPublicationId: savedPublication.id,
+          },
+          updatedAt: new Date().toISOString(),
+        }, storedCase.clustering.fingerprint);
+        publish = {
+          attempted: true,
+          ok: true,
+          repo: published.repo,
+          skippedReason: '',
+          result: savedPublication.result,
+        };
+      } catch (error) {
+        publish = {
+          attempted: true,
+          ok: false,
+          repo: resolvedRepo,
+          skippedReason: '',
+          result: {
+            error: String(error?.message ?? error),
+          },
+        };
+      }
+    }
+
+    return {
+      schemaVersion: 1,
+      setup,
+      submission: {
+        accepted: true,
+        submissionId: submission.id,
+      },
+      triage: {
+        caseId: storedCase.id,
+        caseStatus: store.getCase(storedCase.id)?.status ?? storedCase.status,
+        actionable: Boolean(storedCase.decisionReadiness?.actionable),
+        publishPolicyOutcome: storedCase.decisionReadiness?.publishPolicyOutcome ?? 'hold_and_watch',
+      },
+      publish,
+      decisionSync: {
+        ready: Boolean(setup.setupStages.decisionSyncReady),
+        mode: setup.publisherMode === 'app' ? 'github_issue_comment_webhook' : 'not_app_mode',
+        nextStep:
+          setup.publisherMode === 'app'
+            ? publish.ok
+              ? 'Leave a maintainer comment such as /defer on the published GitHub issue to verify decision sync.'
+              : 'Finish publish verification first, then verify decision sync with a GitHub issue comment.'
+            : 'Decision sync verification requires GitHub App mode.',
+      },
+    };
   }
 
   function toRuntimeEventFromSentry(payload) {
@@ -426,6 +617,11 @@ export function createSignalForgeApi({
           fileSystem: fs,
         });
         return { statusCode: 200, body: status };
+      }
+
+      if (method === 'POST' && url === '/verify/run') {
+        const result = await runVerification(body?.target ?? {});
+        return { statusCode: 200, body: result };
       }
 
       if (method === 'POST' && url === '/submissions') {

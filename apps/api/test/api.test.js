@@ -247,6 +247,52 @@ test('api exposes shared setup status for install and verification flows', async
   assert.equal(Array.isArray(response.body.checks), true);
 });
 
+test('api verify run returns setup triage publish and decision-sync verification state', async () => {
+  const githubPublisher = {
+    async publishCase({ repo }) {
+      return {
+        repo,
+        mode: 'github_issue',
+        snapshot: {
+          title: 'Verify issue',
+          body: 'Verify body',
+          labels: ['source:user-feedback'],
+          assignees: [],
+        },
+        result: {
+          externalId: 'gh_issue_verify_1',
+          url: `https://github.com/${repo}/issues/1`,
+          number: 1,
+        },
+      };
+    },
+  };
+
+  const api = createSignalForgeApi({
+    store: createStore(':memory:'),
+    logger: { error() {}, warn() {} },
+    githubPublisher,
+    env: { GITHUB_PUBLISHER: 'preview' },
+    repoRoot: '/tmp/signalforge-verify-test',
+  });
+
+  const response = await api.handleRequest({
+    method: 'POST',
+    url: '/verify/run',
+    body: {
+      target: { repo: 'uDeserve/signalforge-e2e-lab' },
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.schemaVersion, 1);
+  assert.equal(response.body.submission.accepted, true);
+  assert.equal(typeof response.body.triage.caseId, 'string');
+  assert.equal(response.body.publish.ok, true);
+  assert.equal(response.body.publish.result.url, 'https://github.com/uDeserve/signalforge-e2e-lab/issues/1');
+  assert.equal(response.body.decisionSync.ready, false);
+});
+
 test('aggregated case updates evidence counts timestamps and linked submissions', async () => {
   const api = createSignalForgeApi({ store: createStore(':memory:'), logger: { error() {}, warn() {} } });
 
