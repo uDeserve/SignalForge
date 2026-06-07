@@ -23,6 +23,7 @@ import {
   createPreviewGitHubPublisher,
   createDecisionRecord,
   createIssuePublication,
+  getGitHubAppInstallationForRepo,
   parseOwnerCommand,
 } from '../../../packages/github-bridge/src/index.js';
 import { DelegationKind, DelegationStatus } from '../../../packages/core/src/index.js';
@@ -32,6 +33,14 @@ const DEFAULT_POLICY = Object.freeze({
   publishBias: 'lenient',
   privacyMode: 'strict',
 });
+
+function readHeader(headers = {}, key) {
+  const target = key.toLowerCase();
+  for (const [name, value] of Object.entries(headers ?? {})) {
+    if (String(name).toLowerCase() === target) return String(value ?? '').trim();
+  }
+  return '';
+}
 
 function firstNonEmpty(...values) {
   for (const value of values) {
@@ -51,6 +60,7 @@ function parseCasesQuery(url) {
   return {
     status: target.searchParams.get('status') ?? '',
     sourceKind: target.searchParams.get('sourceKind') ?? '',
+    projectKey: target.searchParams.get('projectKey') ?? '',
     published:
       publishedParam === 'true' ? true : publishedParam === 'false' ? false : undefined,
   };
@@ -65,6 +75,413 @@ function buildExistingClusterHints(cases = []) {
     runtimeEventCount: caseRecord.evidenceSummary?.runtimeEventCount ?? 0,
     sourceKind: caseRecord.metadata?.sourceKind ?? '',
   }));
+}
+
+function slugifyProjectName(name = '') {
+  return String(name)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48) || 'project';
+}
+
+function buildProjectKey(slug) {
+  return `proj_${slug.replace(/-/g, '_')}_${randomUUID().slice(0, 8)}`;
+}
+
+function buildBindingCode() {
+  return `sfbind_${randomUUID().replace(/-/g, '').slice(0, 10)}`;
+}
+
+function normalizeProjectRepo(repo = {}) {
+  if (typeof repo === 'string') {
+    const fullName = repo.trim().replace(/^https:\/\/github\.com\//i, '').replace(/^github\.com\//i, '');
+    const [owner = '', name = ''] = fullName.split('/').map((part) => String(part ?? '').trim()).filter(Boolean);
+    return {
+      owner,
+      name,
+      fullName: owner && name ? `${owner}/${name}` : fullName,
+    };
+  }
+  const owner = String(repo.owner ?? '').trim();
+  const name = String(repo.name ?? '').trim();
+  const fullName = firstNonEmpty(repo.fullName, owner && name ? `${owner}/${name}` : '');
+  return {
+    owner,
+    name,
+    fullName,
+  };
+}
+
+function namespaceFingerprint(projectKey, fingerprint) {
+  const resolvedProjectKey = String(projectKey ?? '').trim();
+  if (!resolvedProjectKey) return fingerprint;
+  return `${resolvedProjectKey}::${fingerprint}`;
+}
+
+function projectRepoToSuggestedRepo(project) {
+  return firstNonEmpty(project?.repo?.fullName, project?.metadata?.github?.repo);
+}
+
+function buildProjectResponse(project, publicBaseUrl) {
+  return {
+    ...project,
+    github: {
+      repo: projectRepoToSuggestedRepo(project),
+      ...(project.metadata?.github ?? {}),
+    },
+    hosted: {
+      endpoint: publicBaseUrl,
+      projectKeyHeader: 'X-SignalForge-Project-Key',
+      clientConfig: {
+        endpoint: publicBaseUrl,
+        projectKey: project.projectKey,
+        appName: project.appName,
+      },
+      env: {
+        VITE_SIGNALFORGE_ENDPOINT: publicBaseUrl,
+        VITE_SIGNALFORGE_PROJECT_KEY: project.projectKey,
+        VITE_SIGNALFORGE_APP_NAME: project.appName,
+      },
+    },
+  };
+}
+
+function withProjectGitHubConnection(project, connection) {
+  return {
+    ...project,
+    updatedAt: new Date().toISOString(),
+    metadata: {
+      ...(project.metadata ?? {}),
+      github: {
+        ...(project.metadata?.github ?? {}),
+        repo: connection.repo || projectRepoToSuggestedRepo(project),
+        connected: Boolean(connection.connected),
+        canPublish: Boolean(connection.canPublish),
+        status: connection.status,
+        installationConnected: Boolean(connection.connected),
+        installationId: connection.installation?.installationId ?? '',
+        appSlug: connection.installation?.appSlug ?? '',
+        permissionsOk: Boolean(connection.installation?.hasRequiredPermissions),
+        eventsOk: Boolean(connection.installation?.hasRequiredEvents),
+        lastCheckedAt: new Date().toISOString(),
+        error: connection.error ?? '',
+      },
+    },
+  };
+}
+
+function buildGitHubAppInstallUrl(env, sessionId = '') {
+  const explicit = firstNonEmpty(env.SIGNALFORGE_GITHUB_APP_INSTALL_URL);
+  const slug = firstNonEmpty(env.GITHUB_APP_SLUG, env.SIGNALFORGE_GITHUB_APP_SLUG);
+  const raw = explicit || (slug ? `https://github.com/apps/${slug}/installations/new` : '');
+  if (!raw) return '';
+  if (!sessionId) return raw;
+  try {
+    const url = new URL(raw);
+    url.searchParams.set('signalforge_session', sessionId);
+    return url.toString();
+  } catch {
+    return raw;
+  }
+}
+
+function createHostedProjectRecord(store, body = {}) {
+  const now = new Date().toISOString();
+  const name = firstNonEmpty(body?.name, body?.appName, 'SignalForge Project');
+  const baseSlug = slugifyProjectName(name);
+  let slug = baseSlug;
+  let suffix = 2;
+  while (store.getProjectBySlug(slug)) {
+    slug = `${baseSlug}-${suffix}`;
+    suffix += 1;
+  }
+  return store.saveProject({
+    id: `proj_${randomUUID()}`,
+    createdAt: now,
+    updatedAt: now,
+    name,
+    slug,
+    projectKey: buildProjectKey(slug),
+    appName: firstNonEmpty(body?.appName, slug.replace(/-/g, '_'), 'webapp'),
+    repo: normalizeProjectRepo(body?.repo ?? {}),
+    status: 'active',
+    metadata: {
+      source: 'hosted_onboarding',
+      github: {
+        repo: normalizeProjectRepo(body?.repo ?? {}).fullName,
+        installationConnected: false,
+      },
+    },
+  });
+}
+
+function buildSetupSessionState({
+  session,
+  project,
+  connection,
+  store,
+  publicBaseUrl,
+  env,
+}) {
+  const projectKey = project.projectKey;
+  const repo = projectRepoToSuggestedRepo(project);
+  const submissions = store.listSubmissions({ projectKey });
+  const cases = store.listCases({ projectKey });
+  const publishedCases = store.listCases({ projectKey, published: true });
+  const installUrl = buildGitHubAppInstallUrl(env, session.id);
+  const githubBinding = session.metadata?.githubBinding ?? {};
+  const bindingCode = firstNonEmpty(githubBinding.bindingCode);
+  const bindingConfirmed = Boolean(githubBinding.confirmedAt);
+  const bindingRepo = firstNonEmpty(githubBinding.repo, repo);
+  const bindingInstallationId = firstNonEmpty(
+    githubBinding.installationId,
+    connection.installation?.installationId,
+  );
+  const githubInstalled = Boolean(connection.connected);
+  const permissionsOk = Boolean(connection.installation?.hasRequiredPermissions);
+  const eventsOk = Boolean(connection.installation?.hasRequiredEvents);
+  const firstSubmissionSeen = submissions.length > 0;
+  const firstCaseCreated = cases.length > 0;
+  const firstIssuePublished = publishedCases.length > 0;
+
+  let currentStage = 'project_created';
+  if (!githubInstalled && !bindingConfirmed) currentStage = 'awaiting_github_app_install';
+  else if (!bindingConfirmed) currentStage = 'awaiting_install_binding_confirmation';
+  else if (!githubInstalled) currentStage = 'awaiting_github_app_install';
+  else if (!permissionsOk || !eventsOk) currentStage = 'awaiting_github_app_configuration';
+  else if (!firstSubmissionSeen) currentStage = 'awaiting_first_submission';
+  else if (!firstCaseCreated) currentStage = 'awaiting_first_case';
+  else if (!firstIssuePublished) currentStage = 'ready_for_first_publish';
+  else currentStage = 'live';
+
+  const blockingHumanAction = !githubInstalled && !bindingConfirmed
+    ? {
+        type: 'github_app_install',
+        required: true,
+        title: 'Install the GitHub App',
+        description: bindingRepo
+          ? `Install the SignalForge GitHub App into ${bindingRepo}, then confirm the installation with binding code ${bindingCode}.`
+          : `Install the SignalForge GitHub App into the target repository, then confirm the installation with binding code ${bindingCode}.`,
+        url: installUrl,
+      }
+    : !bindingConfirmed
+      ? {
+          type: 'github_install_binding_confirmation',
+          required: true,
+          title: 'Confirm the installed repository binding',
+          description: bindingRepo
+            ? `Confirm that ${bindingRepo} is the repository installed with binding code ${bindingCode}.`
+            : `Confirm the installed repository with binding code ${bindingCode}.`,
+          url: `${publicBaseUrl}/setup/sessions/${session.id}/github-binding`,
+        }
+    : !permissionsOk || !eventsOk
+      ? {
+          type: 'github_app_permissions',
+          required: true,
+          title: 'Fix GitHub App permissions or events',
+          description: 'The GitHub App is installed, but required issue permissions or webhook events are still missing.',
+          url: installUrl,
+        }
+      : null;
+
+  return {
+    currentStage,
+    stages: {
+      project_created: true,
+      project_key_issued: true,
+      binding_code_issued: Boolean(bindingCode),
+      install_binding_confirmed: bindingConfirmed,
+      github_app_installed: githubInstalled,
+      permissions_ok: permissionsOk,
+      events_ok: eventsOk,
+      ingestion_ready: bindingConfirmed && githubInstalled && permissionsOk && eventsOk,
+      first_submission_seen: firstSubmissionSeen,
+      first_case_created: firstCaseCreated,
+      first_issue_published: firstIssuePublished,
+    },
+    counters: {
+      submissions: submissions.length,
+      cases: cases.length,
+      publishedCases: publishedCases.length,
+    },
+    installUrl,
+    blockingHumanAction,
+    binding: {
+      code: bindingCode,
+      confirmed: bindingConfirmed,
+      repo: bindingRepo,
+      installationId: bindingInstallationId,
+      confirmUrl: `${publicBaseUrl}/setup/sessions/${session.id}/github-binding`,
+      refreshCodeUrl: `${publicBaseUrl}/setup/sessions/${session.id}/binding-code/refresh`,
+    },
+    envPatch: {
+      VITE_SIGNALFORGE_ENDPOINT: publicBaseUrl,
+      VITE_SIGNALFORGE_PROJECT_KEY: project.projectKey,
+      VITE_SIGNALFORGE_APP_NAME: project.appName,
+    },
+    headers: {
+      'X-SignalForge-Project-Key': project.projectKey,
+    },
+    api: {
+      endpoint: publicBaseUrl,
+      submissionUrl: `${publicBaseUrl}/submissions`,
+      runtimeEventsUrl: `${publicBaseUrl}/runtime-events`,
+      casesUrl: `${publicBaseUrl}/cases?projectKey=${project.projectKey}`,
+      statusUrl: `${publicBaseUrl}/setup/sessions/${session.id}`,
+      agentContractUrl: `${publicBaseUrl}/setup/sessions/${session.id}/agent-contract`,
+      githubBindingConfirmUrl: `${publicBaseUrl}/setup/sessions/${session.id}/github-binding`,
+      githubBindingCodeRefreshUrl: `${publicBaseUrl}/setup/sessions/${session.id}/binding-code/refresh`,
+    },
+    verify: {
+      nextAgentAction:
+        !githubInstalled && !bindingConfirmed
+          ? 'wait_for_human_github_install_then_confirm_binding'
+          : !bindingConfirmed
+            ? 'confirm_github_install_binding'
+            : !githubInstalled
+              ? 'wait_for_human_github_install'
+          : !firstSubmissionSeen
+            ? 'patch_target_app_and_send_first_submission'
+            : !firstCaseCreated
+              ? 'run_triage_for_first_submission'
+              : !firstIssuePublished
+                ? 'verify_publish_flow'
+                : 'monitor_live_project',
+      recommendedSubmission: {
+        source: 'adapter',
+        content: {
+          title: '[SignalForge Setup] First feedback signal',
+          body: 'This first signal verifies that the app can reach the hosted SignalForge project.',
+          categoryHint: 'feedback',
+        },
+      },
+    },
+  };
+}
+
+async function refreshSetupSessionRecord({
+  session,
+  store,
+  publicBaseUrl,
+  env,
+  inspectProjectGitHubConnection,
+}) {
+  const project = store.getProjectById(session.projectId);
+  if (!project) return null;
+  const connection = await inspectProjectGitHubConnection(project);
+  const updatedProject = store.saveProject(withProjectGitHubConnection(project, connection));
+  const nextState = buildSetupSessionState({
+    session,
+    project: updatedProject,
+    connection,
+    store,
+    publicBaseUrl,
+    env,
+  });
+  const nextStatus = nextState.currentStage === 'live' ? 'ready' : 'active';
+  return store.saveSetupSession({
+    ...session,
+    updatedAt: new Date().toISOString(),
+    state: nextState,
+    status: nextStatus,
+      metadata: {
+        ...(session.metadata ?? {}),
+        projectKey: updatedProject.projectKey,
+      },
+    });
+}
+
+async function confirmSetupSessionGitHubBinding({
+  session,
+  body,
+  store,
+  publicBaseUrl,
+  env,
+  inspectProjectGitHubConnection,
+}) {
+  const expectedBindingCode = firstNonEmpty(session.metadata?.githubBinding?.bindingCode);
+  const providedBindingCode = firstNonEmpty(body?.bindingCode);
+  if (!expectedBindingCode || providedBindingCode !== expectedBindingCode) {
+    return {
+      statusCode: 422,
+      error: {
+        code: 'invalid_binding_code',
+        message: 'bindingCode does not match this setup session',
+      },
+    };
+  }
+
+  const project = store.getProjectById(session.projectId);
+  if (!project) {
+    return {
+      statusCode: 404,
+      error: { code: 'not_found', message: 'setup session project not found' },
+    };
+  }
+
+  const resolvedRepo = normalizeProjectRepo(
+    body?.repo ?? body?.repository ?? session.target?.repo ?? project.repo ?? {},
+  );
+  if (!resolvedRepo.fullName) {
+    return {
+      statusCode: 422,
+      error: {
+        code: 'missing_repo',
+        message: 'repo is required to confirm the GitHub App binding',
+      },
+    };
+  }
+
+  const now = new Date().toISOString();
+  const installationId = firstNonEmpty(body?.installationId);
+  store.saveProject({
+    ...project,
+    updatedAt: now,
+    repo: resolvedRepo,
+    metadata: {
+      ...(project.metadata ?? {}),
+      github: {
+        ...(project.metadata?.github ?? {}),
+        repo: resolvedRepo.fullName,
+        bindingStatus: 'confirmed',
+        bindingConfirmedAt: now,
+        bindingCodeLastConfirmed: expectedBindingCode,
+        boundBySetupSessionId: session.id,
+        ...(installationId ? { installationId } : {}),
+      },
+    },
+  });
+
+  const updatedSession = store.saveSetupSession({
+    ...session,
+    updatedAt: now,
+    target: {
+      ...(session.target ?? {}),
+      repo: resolvedRepo,
+    },
+    metadata: {
+      ...(session.metadata ?? {}),
+      githubBinding: {
+        ...(session.metadata?.githubBinding ?? {}),
+        bindingCode: expectedBindingCode,
+        repo: resolvedRepo.fullName,
+        confirmedAt: now,
+        status: 'confirmed',
+        ...(installationId ? { installationId } : {}),
+        confirmedBy: body?.actor ?? session.actor ?? { type: 'agent', id: 'agent' },
+      },
+    },
+  });
+
+  const refreshed = await refreshSetupSessionRecord({
+    session: updatedSession,
+    store,
+    publicBaseUrl,
+    env,
+    inspectProjectGitHubConnection,
+  });
+  return refreshed;
 }
 
 function computePublishPolicy(caseRecord) {
@@ -121,6 +538,7 @@ function buildSubmissionCaseRecord({ triaged, submission, existingCase, store, d
     existingCase?.metadata?.triage?.clusterSizeEstimate ?? 1,
     submissionCount,
   );
+  const project = submission.raw?.signalforgeProject ?? existingCase?.metadata?.project ?? null;
   const nextCase = createCase({
     id: existingCase?.id ?? `case_${randomUUID()}`,
     createdAt: existingCase?.createdAt ?? now,
@@ -182,6 +600,7 @@ function buildSubmissionCaseRecord({ triaged, submission, existingCase, store, d
     metadata: {
       ...(existingCase?.metadata ?? {}),
       sourceKind: 'user_feedback',
+      project,
       triage: {
         ...(triaged.semantic ?? {}),
         clusterAction: existingCase ? 'merge_existing' : triaged.semantic?.clusterAction ?? 'new_cluster',
@@ -196,6 +615,7 @@ function buildSubmissionCaseRecord({ triaged, submission, existingCase, store, d
 
 function createCaseRecordFromRuntimeEvent(event, triaged, defaultSuggestedRepo) {
   const now = new Date().toISOString();
+  const project = event.raw?.signalforgeProject ?? null;
   return updateCaseAfterPolicy(createCase({
     id: `case_${randomUUID()}`,
     createdAt: now,
@@ -241,6 +661,7 @@ function createCaseRecordFromRuntimeEvent(event, triaged, defaultSuggestedRepo) 
     metadata: {
       triage: triaged.semantic ?? null,
       sourceKind: 'runtime_signal',
+      project,
       runtimeSummary: {
         environments: [event.environment].filter(Boolean),
         releases: [event.release].filter(Boolean),
@@ -305,6 +726,7 @@ function toInboxItem(caseRecord) {
     publishPolicyOutcome: caseRecord.decisionReadiness?.publishPolicyOutcome ?? 'hold_and_watch',
     publication: caseRecord.publication,
     sourceKind: caseRecord.metadata?.sourceKind ?? 'user_feedback',
+    project: caseRecord.metadata?.project ?? null,
     clustering: caseRecord.clustering,
     decisionReadiness: caseRecord.decisionReadiness,
     evidenceSummary: caseRecord.evidenceSummary,
@@ -357,8 +779,82 @@ export function createSignalForgeApi({
   githubPublisher = createPreviewGitHubPublisher(),
   env = process.env,
   repoRoot = fileURLToPath(new URL('../../..', import.meta.url)),
+  fetchImpl = globalThis.fetch,
 } = {}) {
   const defaultSuggestedRepo = String(env.SIGNALFORGE_E2E_REPO ?? 'org/repo').trim() || 'org/repo';
+  const publicBaseUrl = firstNonEmpty(env.SIGNALFORGE_PUBLIC_BASE_URL, 'http://localhost:8787');
+
+  function resolveProjectFromHeaders(headers = {}) {
+    const projectKey = readHeader(headers, 'x-signalforge-project-key');
+    if (!projectKey) return null;
+    return store.getProjectByKey(projectKey) ?? null;
+  }
+
+  function requireProjectKey() {
+    return String(env.SIGNALFORGE_HOSTED_MODE ?? '').trim().toLowerCase() === 'true' || store.listProjects().length > 0;
+  }
+
+  async function inspectProjectGitHubConnection(project) {
+    const repo = projectRepoToSuggestedRepo(project);
+    if (!repo) {
+      return {
+        connected: false,
+        canPublish: false,
+        status: 'repo_missing',
+        repo: '',
+        installation: null,
+      };
+    }
+
+    const appId = String(env.GITHUB_APP_ID ?? '').trim();
+    const privateKeyPem = String(env.GITHUB_APP_PRIVATE_KEY ?? '').trim();
+    const apiBaseUrl = String(env.GITHUB_API_BASE_URL ?? 'https://api.github.com').trim();
+
+    if (!appId || !privateKeyPem) {
+      return {
+        connected: false,
+        canPublish: false,
+        status: 'app_auth_missing',
+        repo,
+        installation: null,
+      };
+    }
+
+    try {
+      const installation = await getGitHubAppInstallationForRepo({
+        appId,
+        privateKeyPem,
+        repo,
+        apiBaseUrl,
+        fetchImpl,
+      });
+      if (!installation) {
+        return {
+          connected: false,
+          canPublish: false,
+          status: 'not_installed',
+          repo,
+          installation: null,
+        };
+      }
+      return {
+        connected: true,
+        canPublish: Boolean(installation.hasRequiredPermissions),
+        status: installation.hasRequiredPermissions && installation.hasRequiredEvents ? 'ready' : 'installed_with_gaps',
+        repo,
+        installation,
+      };
+    } catch (error) {
+      return {
+        connected: false,
+        canPublish: false,
+        status: 'check_failed',
+        repo,
+        installation: null,
+        error: String(error?.message ?? error),
+      };
+    }
+  }
 
   async function maybeAutoPublish(caseRecord) {
     if (
@@ -406,36 +902,65 @@ export function createSignalForgeApi({
     {
       autoPublish = true,
       defaultSuggestedRepoOverride = '',
+      project = null,
     } = {},
   ) {
-    const existingClusters = buildExistingClusterHints(store.listCases());
+    const scopedProjectKey = project?.projectKey ?? submission.raw?.signalforgeProject?.projectKey ?? '';
+    const existingClusters = buildExistingClusterHints(
+      store.listCases({
+        projectKey: scopedProjectKey || undefined,
+      })
+    );
     const triaged = await triageEngine.triageSubmission(submission, {
       requestId: `triage_${submission.id}`,
       policy: DEFAULT_POLICY,
       existingClusters,
     });
-    const existingCase = store.findCaseByFingerprint(triaged.fingerprint);
+    const namespacedFingerprint = namespaceFingerprint(scopedProjectKey, triaged.fingerprint);
+    const existingCase = store.findCaseByFingerprint(namespacedFingerprint);
     const caseRecord = buildSubmissionCaseRecord({
-      triaged,
+      triaged: {
+        ...triaged,
+        fingerprint: namespacedFingerprint,
+      },
       submission,
       existingCase,
       store,
-      defaultSuggestedRepo: defaultSuggestedRepoOverride || defaultSuggestedRepo,
+      defaultSuggestedRepo:
+        defaultSuggestedRepoOverride ||
+        projectRepoToSuggestedRepo(project) ||
+        defaultSuggestedRepo,
     });
     const storedCase = store.upsertCase(caseRecord, caseRecord.clustering.fingerprint);
     return autoPublish ? maybeAutoPublish(storedCase) : storedCase;
   }
 
-  async function handleRuntimeEvent(event) {
+  async function handleRuntimeEvent(event, { project = null } = {}) {
+    const scopedProjectKey = project?.projectKey ?? event.raw?.signalforgeProject?.projectKey ?? '';
     const triaged = await triageEngine.triageRuntimeEvent(event, {
       requestId: `triage_${event.id}`,
       policy: DEFAULT_POLICY,
-      existingClusters: buildExistingClusterHints(store.listCases()),
+      existingClusters: buildExistingClusterHints(
+        store.listCases({
+          projectKey: scopedProjectKey || undefined,
+        })
+      ),
     });
-    const existingCase = triaged.fingerprint ? store.findCaseByFingerprint(triaged.fingerprint) : null;
+    const namespacedFingerprint = namespaceFingerprint(scopedProjectKey, triaged.fingerprint);
+    const existingCase = namespacedFingerprint ? store.findCaseByFingerprint(namespacedFingerprint) : null;
     const storedCase = existingCase
       ? store.upsertCase(enrichCaseWithRuntimeEvent(existingCase, event), existingCase.clustering.fingerprint)
-      : store.upsertCase(createCaseRecordFromRuntimeEvent(event, triaged, defaultSuggestedRepo), triaged.fingerprint);
+      : store.upsertCase(
+          createCaseRecordFromRuntimeEvent(
+            event,
+            {
+              ...triaged,
+              fingerprint: namespacedFingerprint,
+            },
+            projectRepoToSuggestedRepo(project) || defaultSuggestedRepo
+          ),
+          namespacedFingerprint
+        );
     return maybeAutoPublish(storedCase);
   }
 
@@ -584,6 +1109,84 @@ export function createSignalForgeApi({
     };
   }
 
+  async function createSetupSession(body = {}) {
+    const project = createHostedProjectRecord(store, body);
+    const now = new Date().toISOString();
+    const session = store.saveSetupSession({
+      id: `setup_${randomUUID()}`,
+      createdAt: now,
+      updatedAt: now,
+      projectId: project.id,
+      actor: body.actor ?? {
+        type: 'agent',
+        id: firstNonEmpty(body.actor?.id, 'agent'),
+      },
+      target: {
+        repo: normalizeProjectRepo(body.repo ?? {}),
+        appName: project.appName,
+      },
+      state: {},
+      status: 'active',
+      metadata: {
+        source: 'agent_first_onboarding',
+        projectKey: project.projectKey,
+        githubBinding: {
+          bindingCode: buildBindingCode(),
+          issuedAt: now,
+          status: 'issued',
+          repo: normalizeProjectRepo(body.repo ?? {}).fullName,
+        },
+      },
+    });
+    return refreshSetupSessionRecord({
+      session,
+      store,
+      publicBaseUrl,
+      env,
+      inspectProjectGitHubConnection,
+    });
+  }
+
+  function buildSetupSessionResponse(session) {
+    const project = store.getProjectById(session.projectId);
+    return {
+      id: session.id,
+      status: session.status,
+      createdAt: session.createdAt,
+      updatedAt: session.updatedAt,
+      actor: session.actor,
+      target: session.target,
+      project: project ? buildProjectResponse(project, publicBaseUrl) : null,
+      state: session.state,
+    };
+  }
+
+  function buildSetupSessionAgentContract(session) {
+    const response = buildSetupSessionResponse(session);
+    return {
+      schemaVersion: 1,
+      product: 'SignalForge',
+      objective: 'Connect a web app to hosted SignalForge with the minimum possible human action.',
+      mode: 'agent_first_hosted_onboarding',
+      setupSession: response,
+      instructions: {
+        blockingHumanAction: response.state.blockingHumanAction,
+        nextAgentAction: response.state.verify?.nextAgentAction ?? 'poll_setup_session',
+        installUrl: response.state.installUrl,
+        binding: response.state.binding ?? {},
+      },
+      machineConfig: {
+        endpoint: response.project?.hosted?.endpoint ?? publicBaseUrl,
+        projectKey: response.project?.projectKey ?? '',
+        appName: response.project?.appName ?? '',
+        headerName: 'X-SignalForge-Project-Key',
+        envPatch: response.state.envPatch ?? {},
+      },
+      api: response.state.api ?? {},
+      binding: response.state.binding ?? {},
+    };
+  }
+
   function toRuntimeEventFromSentry(payload) {
     const exception = payload?.exception?.values?.[0] ?? {};
     return createRuntimeEvent({
@@ -604,10 +1207,132 @@ export function createSignalForgeApi({
     });
   }
 
-  async function handleRequest({ method, url, body }) {
+  async function handleRequest({ method, url, body, headers = {} }) {
     try {
+      const project = resolveProjectFromHeaders(headers);
+
       if (method === 'GET' && url === '/health') {
         return { statusCode: 200, body: { ok: true } };
+      }
+
+      if (method === 'POST' && url === '/setup/sessions') {
+        const session = await createSetupSession(body ?? {});
+        return { statusCode: 201, body: buildSetupSessionResponse(session) };
+      }
+
+      if (method === 'GET' && url?.startsWith('/setup/sessions/')) {
+        const route = new URL(url, 'http://signalforge.local');
+        const sessionId = route.pathname.split('/')[3];
+        const subroute = route.pathname.split('/').slice(4).join('/');
+        const existing = store.getSetupSession(sessionId);
+        if (!existing) {
+          return { statusCode: 404, error: { code: 'not_found', message: 'setup session not found' } };
+        }
+        const refreshed = await refreshSetupSessionRecord({
+          session: existing,
+          store,
+          publicBaseUrl,
+          env,
+          inspectProjectGitHubConnection,
+        });
+        if (!refreshed) {
+          return { statusCode: 404, error: { code: 'not_found', message: 'setup session project not found' } };
+        }
+        if (!subroute) {
+          return { statusCode: 200, body: buildSetupSessionResponse(refreshed) };
+        }
+        if (subroute === 'agent-contract') {
+          return { statusCode: 200, body: buildSetupSessionAgentContract(refreshed) };
+        }
+      }
+
+      if (method === 'POST' && url?.startsWith('/setup/sessions/')) {
+        const route = new URL(url, 'http://signalforge.local');
+        const sessionId = route.pathname.split('/')[3];
+        const subroute = route.pathname.split('/').slice(4).join('/');
+        const existing = store.getSetupSession(sessionId);
+        if (!existing) {
+          return { statusCode: 404, error: { code: 'not_found', message: 'setup session not found' } };
+        }
+        if (subroute === 'binding-code/refresh') {
+          const now = new Date().toISOString();
+          const refreshedSession = store.saveSetupSession({
+            ...existing,
+            updatedAt: now,
+            metadata: {
+              ...(existing.metadata ?? {}),
+              githubBinding: {
+                ...(existing.metadata?.githubBinding ?? {}),
+                bindingCode: buildBindingCode(),
+                issuedAt: now,
+                confirmedAt: '',
+                status: 'issued',
+              },
+            },
+          });
+          const refreshed = await refreshSetupSessionRecord({
+            session: refreshedSession,
+            store,
+            publicBaseUrl,
+            env,
+            inspectProjectGitHubConnection,
+          });
+          return { statusCode: 200, body: buildSetupSessionResponse(refreshed) };
+        }
+        if (subroute === 'github-binding') {
+          const refreshed = await confirmSetupSessionGitHubBinding({
+            session: existing,
+            body: body ?? {},
+            store,
+            publicBaseUrl,
+            env,
+            inspectProjectGitHubConnection,
+          });
+          if (refreshed?.statusCode) return refreshed;
+          return { statusCode: 200, body: buildSetupSessionResponse(refreshed) };
+        }
+      }
+
+      if (method === 'POST' && url === '/projects') {
+        const createdProject = createHostedProjectRecord(store, body ?? {});
+        return { statusCode: 201, body: buildProjectResponse(createdProject, publicBaseUrl) };
+      }
+
+      if (method === 'GET' && url?.startsWith('/projects')) {
+        const route = new URL(url, 'http://signalforge.local');
+        if (route.pathname === '/projects') {
+          const items = store.listProjects().map((item) => buildProjectResponse(item, publicBaseUrl));
+          return { statusCode: 200, body: { items } };
+        }
+        const projectId = route.pathname.split('/')[2];
+        const subroute = route.pathname.split('/').slice(3).join('/');
+        const projectRecord = store.getProjectById(projectId);
+        if (!projectRecord) {
+          return { statusCode: 404, error: { code: 'not_found', message: 'project not found' } };
+        }
+        if (!subroute) {
+          return { statusCode: 200, body: buildProjectResponse(projectRecord, publicBaseUrl) };
+        }
+        if (method === 'GET' && subroute === 'github-connection') {
+          const connection = await inspectProjectGitHubConnection(projectRecord);
+          const updated = store.saveProject(withProjectGitHubConnection(projectRecord, connection));
+          return { statusCode: 200, body: buildProjectResponse(updated, publicBaseUrl) };
+        }
+      }
+
+      if (method === 'POST' && url?.startsWith('/projects/')) {
+        const route = new URL(url, 'http://signalforge.local');
+        const projectId = route.pathname.split('/')[2];
+        const subroute = route.pathname.split('/').slice(3).join('/');
+        const projectRecord = store.getProjectById(projectId);
+        if (!projectRecord) {
+          return { statusCode: 404, error: { code: 'not_found', message: 'project not found' } };
+        }
+        if (subroute === 'github-connection/refresh') {
+          const connection = await inspectProjectGitHubConnection(projectRecord);
+          const updated = store.saveProject(withProjectGitHubConnection(projectRecord, connection));
+          return { statusCode: 200, body: buildProjectResponse(updated, publicBaseUrl) };
+        }
       }
 
       if (method === 'GET' && url === '/setup/status') {
@@ -625,6 +1350,9 @@ export function createSignalForgeApi({
       }
 
       if (method === 'POST' && url === '/submissions') {
+        if (!project && requireProjectKey()) {
+          return { statusCode: 401, error: { code: 'unauthorized', message: 'valid X-SignalForge-Project-Key is required' } };
+        }
         const now = new Date().toISOString();
         const submission = createSubmission({
           id: `sub_${randomUUID()}`,
@@ -635,10 +1363,35 @@ export function createSignalForgeApi({
           content: body.content,
           evidence: body.evidence,
           privacy: body.privacy,
-          raw: body.raw ?? {},
+          raw: {
+            ...(body.raw ?? {}),
+            ...(project
+              ? {
+                  signalforgeProject: {
+                    projectId: project.id,
+                    projectKey: project.projectKey,
+                    slug: project.slug,
+                    appName: project.appName,
+                  },
+                }
+              : {}),
+          },
         });
         store.saveSubmission(submission);
-        return { statusCode: 201, body: { submissionId: submission.id, status: 'accepted' } };
+        return project
+          ? {
+              statusCode: 201,
+              body: {
+                submissionId: submission.id,
+                status: 'accepted',
+                project: {
+                  id: project.id,
+                  slug: project.slug,
+                  projectKey: project.projectKey,
+                },
+              },
+            }
+          : { statusCode: 201, body: { submissionId: submission.id, status: 'accepted' } };
       }
 
       if (method === 'POST' && url === '/triage/run') {
@@ -653,9 +1406,18 @@ export function createSignalForgeApi({
             ignored += 1;
             continue;
           }
-          const before = store.listCases().length;
-          const storedCase = await triageAndUpsertSubmission(submission);
-          const after = store.listCases().length;
+          if (project && submission.raw?.signalforgeProject?.projectKey !== project.projectKey) {
+            ignored += 1;
+            continue;
+          }
+          const scopedProjectKey = project?.projectKey || submission.raw?.signalforgeProject?.projectKey || '';
+          const before = store.listCases({
+            projectKey: scopedProjectKey || undefined,
+          }).length;
+          const storedCase = await triageAndUpsertSubmission(submission, { project });
+          const after = store.listCases({
+            projectKey: scopedProjectKey || undefined,
+          }).length;
           caseIds.push(storedCase.id);
           if (after > before) created += 1;
           else merged += 1;
@@ -664,6 +1426,9 @@ export function createSignalForgeApi({
       }
 
       if (method === 'POST' && url === '/runtime-events') {
+        if (!project && requireProjectKey()) {
+          return { statusCode: 401, error: { code: 'unauthorized', message: 'valid X-SignalForge-Project-Key is required' } };
+        }
         const event = createRuntimeEvent({
           id: `evt_${randomUUID()}`,
           source: body.source,
@@ -675,10 +1440,22 @@ export function createSignalForgeApi({
           error: body.error,
           tags: body.tags,
           context: body.context,
-          raw: body.raw ?? {},
+          raw: {
+            ...(body.raw ?? {}),
+            ...(project
+              ? {
+                  signalforgeProject: {
+                    projectId: project.id,
+                    projectKey: project.projectKey,
+                    slug: project.slug,
+                    appName: project.appName,
+                  },
+                }
+              : {}),
+          },
         });
         store.saveRuntimeEvent(event);
-        const storedCase = await handleRuntimeEvent(event);
+        const storedCase = await handleRuntimeEvent(event, { project });
         return { statusCode: 201, body: { runtimeEventId: event.id, caseId: storedCase.id } };
       }
 
@@ -706,9 +1483,11 @@ export function createSignalForgeApi({
         const route = new URL(url, 'http://signalforge.local');
         if (route.pathname === '/cases') {
           const filters = parseCasesQuery(url);
+          const scopedProjectKey = firstNonEmpty(filters.projectKey, project?.projectKey);
           const items = store.listCases({
             status: firstNonEmpty(filters.status),
             sourceKind: firstNonEmpty(filters.sourceKind),
+            projectKey: firstNonEmpty(scopedProjectKey),
             published: filters.published,
           }).map(toInboxItem);
           return { statusCode: 200, body: { items } };
@@ -899,7 +1678,7 @@ export function createSignalForgeApi({
       }
     }
 
-    const result = await handleRequest({ method: req.method, url: req.url, body });
+    const result = await handleRequest({ method: req.method, url: req.url, body, headers: req.headers });
     if (result.error) {
       res.writeHead(result.statusCode, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ error: result.error }));

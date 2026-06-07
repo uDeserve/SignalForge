@@ -19,19 +19,26 @@ import {
   parseOwnerCommand,
 } from '../../../packages/github-bridge/src/index.js';
 
-async function createSubmittedCase(api, body) {
+async function createSubmittedCase(api, body, options = {}) {
   const submissionResponse = await api.handleRequest({
     method: 'POST',
     url: '/submissions',
     body,
+    headers: options.headers ?? {},
   });
   const submissionId = submissionResponse.body.submissionId;
   await api.handleRequest({
     method: 'POST',
     url: '/triage/run',
     body: { submissionIds: [submissionId] },
+    headers: options.headers ?? {},
   });
-  const casesResponse = await api.handleRequest({ method: 'GET', url: '/cases', body: {} });
+  const casesResponse = await api.handleRequest({
+    method: 'GET',
+    url: options.casesUrl ?? '/cases',
+    body: {},
+    headers: options.headers ?? {},
+  });
   return casesResponse.body.items[0];
 }
 
@@ -247,6 +254,330 @@ test('api exposes shared setup status for install and verification flows', async
   assert.equal(Array.isArray(response.body.checks), true);
 });
 
+test('hosted onboarding can create a project with reusable client config', async () => {
+  const api = createSignalForgeApi({
+    store: createStore(':memory:'),
+    logger: { error() {}, warn() {} },
+    env: { SIGNALFORGE_PUBLIC_BASE_URL: 'https://sf.example.com' },
+  });
+
+  const response = await api.handleRequest({
+    method: 'POST',
+    url: '/projects',
+    body: {
+      name: 'Omni Lingua',
+      appName: 'omni_lingua',
+      repo: {
+        owner: 'uDeserve',
+        name: 'omni_lingua',
+      },
+    },
+  });
+
+  assert.equal(response.statusCode, 201);
+  assert.match(response.body.projectKey, /^proj_omni_lingua_/);
+  assert.equal(response.body.slug, 'omni-lingua');
+  assert.equal(response.body.hosted.endpoint, 'https://sf.example.com');
+  assert.equal(response.body.hosted.clientConfig.projectKey, response.body.projectKey);
+  assert.equal(response.body.hosted.env.VITE_SIGNALFORGE_PROJECT_KEY, response.body.projectKey);
+});
+
+test('agent-first setup session returns install link, env patch, and current stage', async () => {
+  const api = createSignalForgeApi({
+    store: createStore(':memory:'),
+    logger: { error() {}, warn() {} },
+    env: {
+      SIGNALFORGE_PUBLIC_BASE_URL: 'https://sf.example.com',
+      GITHUB_APP_SLUG: 'signalforge',
+    },
+  });
+
+  const created = await api.handleRequest({
+    method: 'POST',
+    url: '/setup/sessions',
+    body: {
+      name: 'Omni Lingua',
+      appName: 'omni_lingua',
+      repo: {
+        owner: 'uDeserve',
+        name: 'omni_lingua',
+      },
+      actor: {
+        type: 'agent',
+        id: 'codex',
+      },
+    },
+  });
+
+  assert.equal(created.statusCode, 201);
+  assert.equal(created.body.state.currentStage, 'awaiting_github_app_install');
+  assert.equal(created.body.state.blockingHumanAction.type, 'github_app_install');
+  assert.match(created.body.state.installUrl, /^https:\/\/github\.com\/apps\/signalforge\/installations\/new/);
+  assert.match(created.body.state.binding.code, /^sfbind_/);
+  assert.equal(created.body.state.binding.confirmed, false);
+  assert.equal(created.body.state.stages.binding_code_issued, true);
+  assert.equal(created.body.project.hosted.env.VITE_SIGNALFORGE_PROJECT_KEY, created.body.project.projectKey);
+
+  const contract = await api.handleRequest({
+    method: 'GET',
+    url: `/setup/sessions/${created.body.id}/agent-contract`,
+    body: {},
+  });
+
+  assert.equal(contract.statusCode, 200);
+  assert.equal(contract.body.mode, 'agent_first_hosted_onboarding');
+  assert.equal(contract.body.instructions.nextAgentAction, 'wait_for_human_github_install_then_confirm_binding');
+  assert.equal(contract.body.machineConfig.projectKey, created.body.project.projectKey);
+  assert.equal(contract.body.api.statusUrl, `https://sf.example.com/setup/sessions/${created.body.id}`);
+  assert.equal(contract.body.binding.code, created.body.state.binding.code);
+  assert.equal(contract.body.instructions.binding.code, created.body.state.binding.code);
+});
+
+test('setup session can refresh binding code and reject stale confirmation', async () => {
+  const api = createSignalForgeApi({
+    store: createStore(':memory:'),
+    logger: { error() {}, warn() {} },
+    env: {
+      SIGNALFORGE_PUBLIC_BASE_URL: 'https://sf.example.com',
+      GITHUB_APP_SLUG: 'signalforge',
+    },
+  });
+
+  const created = await api.handleRequest({
+    method: 'POST',
+    url: '/setup/sessions',
+    body: {
+      name: 'Reader Lab',
+      appName: 'reader_lab',
+      repo: { owner: 'uDeserve', name: 'reader_lab' },
+    },
+  });
+
+  const originalCode = created.body.state.binding.code;
+  const refreshed = await api.handleRequest({
+    method: 'POST',
+    url: `/setup/sessions/${created.body.id}/binding-code/refresh`,
+    body: {},
+  });
+
+  assert.equal(refreshed.statusCode, 200);
+  assert.notEqual(refreshed.body.state.binding.code, originalCode);
+  assert.equal(refreshed.body.state.binding.confirmed, false);
+
+  const rejected = await api.handleRequest({
+    method: 'POST',
+    url: `/setup/sessions/${created.body.id}/github-binding`,
+    body: {
+      bindingCode: originalCode,
+      repo: 'uDeserve/reader_lab',
+    },
+  });
+
+  assert.equal(rejected.statusCode, 422);
+  assert.equal(rejected.error.code, 'invalid_binding_code');
+});
+
+test('setup session github binding confirmation updates project and stage', async () => {
+  const { privateKey } = await import('node:crypto').then(({ generateKeyPairSync }) =>
+    generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+    }),
+  );
+
+  const api = createSignalForgeApi({
+    store: createStore(':memory:'),
+    logger: { error() {}, warn() {} },
+    env: {
+      SIGNALFORGE_PUBLIC_BASE_URL: 'https://sf.example.com',
+      GITHUB_APP_ID: '123',
+      GITHUB_APP_PRIVATE_KEY: privateKey,
+      GITHUB_API_BASE_URL: 'https://api.github.test',
+      GITHUB_APP_SLUG: 'signalforge',
+    },
+    fetchImpl: async (url) => {
+      if (String(url).endsWith('/repos/uDeserve/reader_lab/installation')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            id: 1001,
+            app_id: 123,
+            app_slug: 'signalforge',
+            account: { login: 'uDeserve', type: 'User' },
+            target_type: 'Repository',
+            repository_selection: 'selected',
+            permissions: {
+              issues: 'write',
+              metadata: 'read',
+            },
+            events: ['issues', 'issue_comment'],
+            html_url: 'https://github.com/apps/signalforge',
+          }),
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ token: 'jwt-or-token-placeholder' }),
+        text: async () => '',
+      };
+    },
+  });
+
+  const created = await api.handleRequest({
+    method: 'POST',
+    url: '/setup/sessions',
+    body: {
+      name: 'Reader Lab',
+      appName: 'reader_lab',
+      actor: { type: 'agent', id: 'codex' },
+    },
+  });
+
+  const confirmed = await api.handleRequest({
+    method: 'POST',
+    url: `/setup/sessions/${created.body.id}/github-binding`,
+    body: {
+      bindingCode: created.body.state.binding.code,
+      repo: 'uDeserve/reader_lab',
+      installationId: '1001',
+      actor: { type: 'agent', id: 'codex' },
+    },
+  });
+
+  assert.equal(confirmed.statusCode, 200);
+  assert.equal(confirmed.body.state.binding.confirmed, true);
+  assert.equal(confirmed.body.state.binding.repo, 'uDeserve/reader_lab');
+  assert.equal(confirmed.body.state.binding.installationId, '1001');
+  assert.equal(confirmed.body.state.currentStage, 'awaiting_first_submission');
+  assert.equal(confirmed.body.state.stages.install_binding_confirmed, true);
+  assert.equal(confirmed.body.project.github.repo, 'uDeserve/reader_lab');
+  assert.equal(confirmed.body.project.github.installationConnected, true);
+  assert.equal(confirmed.body.project.github.status, 'ready');
+});
+
+test('hosted project can refresh github app installation state', async () => {
+  const { privateKey } = await import('node:crypto').then(({ generateKeyPairSync }) =>
+    generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+    }),
+  );
+
+  const api = createSignalForgeApi({
+    store: createStore(':memory:'),
+    logger: { error() {}, warn() {} },
+    env: {
+      SIGNALFORGE_PUBLIC_BASE_URL: 'https://sf.example.com',
+      GITHUB_APP_ID: '123',
+      GITHUB_APP_PRIVATE_KEY: privateKey,
+      GITHUB_API_BASE_URL: 'https://api.github.test',
+    },
+    fetchImpl: async (url) => {
+      if (String(url).endsWith('/repos/uDeserve/omni_lingua/installation')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            id: 999,
+            app_id: 123,
+            app_slug: 'signalforge',
+            account: { login: 'uDeserve', type: 'User' },
+            target_type: 'Repository',
+            repository_selection: 'selected',
+            permissions: {
+              issues: 'write',
+              metadata: 'read',
+            },
+            events: ['issues', 'issue_comment'],
+            html_url: 'https://github.com/apps/signalforge',
+          }),
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ token: 'jwt-or-token-placeholder' }),
+        text: async () => '',
+      };
+    },
+  });
+
+  const projectResponse = await api.handleRequest({
+    method: 'POST',
+    url: '/projects',
+    body: {
+      name: 'Omni Lingua',
+      appName: 'omni_lingua',
+      repo: {
+        owner: 'uDeserve',
+        name: 'omni_lingua',
+      },
+    },
+  });
+
+  const refresh = await api.handleRequest({
+    method: 'POST',
+    url: `/projects/${projectResponse.body.id}/github-connection/refresh`,
+    body: {},
+  });
+
+  assert.equal(refresh.statusCode, 200);
+  assert.equal(refresh.body.github.connected, true);
+  assert.equal(refresh.body.github.installationId, '999');
+  assert.equal(refresh.body.github.permissionsOk, true);
+  assert.equal(refresh.body.github.eventsOk, true);
+  assert.equal(refresh.body.github.status, 'ready');
+});
+
+test('hosted mode requires a valid project key for submissions once projects exist', async () => {
+  const api = createSignalForgeApi({
+    store: createStore(':memory:'),
+    logger: { error() {}, warn() {} },
+  });
+
+  const projectResponse = await api.handleRequest({
+    method: 'POST',
+    url: '/projects',
+    body: {
+      name: 'Reader App',
+      appName: 'readerapp',
+    },
+  });
+  assert.equal(projectResponse.statusCode, 201);
+
+  const unauthorized = await api.handleRequest({
+    method: 'POST',
+    url: '/submissions',
+    body: {
+      source: 'web_widget',
+      content: { title: 'Missing key', body: 'This should fail without a project key.' },
+    },
+  });
+
+  assert.equal(unauthorized.statusCode, 401);
+  assert.match(unauthorized.error.message, /project-key/i);
+
+  const authorized = await api.handleRequest({
+    method: 'POST',
+    url: '/submissions',
+    headers: {
+      'X-SignalForge-Project-Key': projectResponse.body.projectKey,
+    },
+    body: {
+      source: 'web_widget',
+      reporter: { id: 'user_1' },
+      content: { title: 'Authorized feedback', body: 'This should be accepted.' },
+    },
+  });
+
+  assert.equal(authorized.statusCode, 201);
+  assert.equal(authorized.body.project.projectKey, projectResponse.body.projectKey);
+});
+
 test('api verify run returns setup triage publish and decision-sync verification state', async () => {
   const githubPublisher = {
     async publishCase({ repo }) {
@@ -291,6 +622,54 @@ test('api verify run returns setup triage publish and decision-sync verification
   assert.equal(response.body.publish.ok, true);
   assert.equal(response.body.publish.result.url, 'https://github.com/uDeserve/signalforge-e2e-lab/issues/1');
   assert.equal(response.body.decisionSync.ready, false);
+});
+
+test('similar feedback from different hosted projects stays in separate cases', async () => {
+  const api = createSignalForgeApi({ store: createStore(':memory:'), logger: { error() {}, warn() {} } });
+
+  const projectA = await api.handleRequest({
+    method: 'POST',
+    url: '/projects',
+    body: { name: 'Reader A', appName: 'reader_a' },
+  });
+  const projectB = await api.handleRequest({
+    method: 'POST',
+    url: '/projects',
+    body: { name: 'Reader B', appName: 'reader_b' },
+  });
+
+  const payload = {
+    source: 'web_widget',
+    reporter: { id: 'user_1' },
+    appContext: { route: '/reader/book-1/chapter-3', feature: 'reader_lookup', release: '1.0.0' },
+    content: { title: '手机上点词后挡住正文', body: '点词后弹层挡住阅读内容，没法顺着往下看。' },
+  };
+
+  const first = await createSubmittedCase(api, payload, {
+    headers: { 'X-SignalForge-Project-Key': projectA.body.projectKey },
+    casesUrl: `/cases?projectKey=${projectA.body.projectKey}`,
+  });
+  const second = await createSubmittedCase(api, payload, {
+    headers: { 'X-SignalForge-Project-Key': projectB.body.projectKey },
+    casesUrl: `/cases?projectKey=${projectB.body.projectKey}`,
+  });
+
+  assert.notEqual(first.id, second.id);
+
+  const casesResponse = await api.handleRequest({
+    method: 'GET',
+    url: '/cases',
+    body: {},
+  });
+  assert.equal(casesResponse.body.items.length, 2);
+
+  const projectOnly = await api.handleRequest({
+    method: 'GET',
+    url: `/cases?projectKey=${projectA.body.projectKey}`,
+    body: {},
+  });
+  assert.equal(projectOnly.body.items.length, 1);
+  assert.equal(projectOnly.body.items[0].project.projectKey, projectA.body.projectKey);
 });
 
 test('aggregated case updates evidence counts timestamps and linked submissions', async () => {

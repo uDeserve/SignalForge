@@ -31,6 +31,14 @@ function filterCases(items, filters = {}) {
     if (filters.status && item.status !== filters.status) return false;
     if (filters.sourceKind && item.metadata?.sourceKind !== filters.sourceKind) return false;
     if (typeof filters.published === 'boolean' && Boolean(item.publication?.published) !== filters.published) return false;
+    if (filters.projectKey && item.metadata?.project?.projectKey !== filters.projectKey) return false;
+    return true;
+  });
+}
+
+function filterSubmissions(items, filters = {}) {
+  return items.filter((item) => {
+    if (filters.projectKey && item.raw?.signalforgeProject?.projectKey !== filters.projectKey) return false;
     return true;
   });
 }
@@ -66,6 +74,31 @@ export function createStore(dbPath = process.env.SIGNALFORGE_DB_PATH || defaultD
       tags_json TEXT NOT NULL,
       context_json TEXT NOT NULL,
       raw_json TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS projects (
+      id TEXT PRIMARY KEY,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      name TEXT NOT NULL,
+      slug TEXT NOT NULL UNIQUE,
+      project_key TEXT NOT NULL UNIQUE,
+      app_name TEXT NOT NULL,
+      repo_json TEXT NOT NULL,
+      status TEXT NOT NULL,
+      metadata_json TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS setup_sessions (
+      id TEXT PRIMARY KEY,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      project_id TEXT NOT NULL,
+      actor_json TEXT NOT NULL,
+      target_json TEXT NOT NULL,
+      state_json TEXT NOT NULL,
+      status TEXT NOT NULL,
+      metadata_json TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS cases (
@@ -146,6 +179,10 @@ export function createStore(dbPath = process.env.SIGNALFORGE_DB_PATH || defaultD
       const row = db.prepare(`SELECT * FROM submissions WHERE id = ?`).get(id);
       return row ? hydrateSubmission(row) : null;
     },
+    listSubmissions(filters = {}) {
+      const items = db.prepare(`SELECT * FROM submissions ORDER BY submitted_at DESC`).all().map(hydrateSubmission);
+      return filterSubmissions(items, filters);
+    },
     listSubmissionsByIds(ids = []) {
       if (!ids.length) return [];
       const statement = db.prepare(`SELECT * FROM submissions WHERE id = ?`);
@@ -196,6 +233,122 @@ export function createStore(dbPath = process.env.SIGNALFORGE_DB_PATH || defaultD
       if (!ids.length) return [];
       const statement = db.prepare(`SELECT * FROM runtime_events WHERE id = ?`);
       return ids.map((id) => statement.get(id)).filter(Boolean).map(hydrateRuntimeEvent);
+    },
+    saveProject(project) {
+      const existing = this.getProjectByKey(project.projectKey) ?? this.getProjectById(project.id);
+      if (existing) {
+        db.prepare(`
+          UPDATE projects
+          SET created_at = ?,
+              updated_at = ?,
+              name = ?,
+              slug = ?,
+              project_key = ?,
+              app_name = ?,
+              repo_json = ?,
+              status = ?,
+              metadata_json = ?
+          WHERE id = ?
+        `).run(
+          project.createdAt,
+          project.updatedAt,
+          project.name,
+          project.slug,
+          project.projectKey,
+          project.appName,
+          JSON.stringify(project.repo ?? {}),
+          project.status,
+          JSON.stringify(project.metadata ?? {}),
+          existing.id,
+        );
+        return this.getProjectById(existing.id);
+      }
+      db.prepare(`
+        INSERT INTO projects (
+          id, created_at, updated_at, name, slug, project_key, app_name, repo_json, status, metadata_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        project.id,
+        project.createdAt,
+        project.updatedAt,
+        project.name,
+        project.slug,
+        project.projectKey,
+        project.appName,
+        JSON.stringify(project.repo ?? {}),
+        project.status,
+        JSON.stringify(project.metadata ?? {}),
+      );
+      return this.getProjectByKey(project.projectKey);
+    },
+    listProjects() {
+      return db.prepare(`SELECT * FROM projects ORDER BY created_at DESC`).all().map(hydrateProject);
+    },
+    getProjectById(id) {
+      const row = db.prepare(`SELECT * FROM projects WHERE id = ?`).get(id);
+      return row ? hydrateProject(row) : null;
+    },
+    getProjectByKey(projectKey) {
+      const row = db.prepare(`SELECT * FROM projects WHERE project_key = ?`).get(projectKey);
+      return row ? hydrateProject(row) : null;
+    },
+    getProjectBySlug(slug) {
+      const row = db.prepare(`SELECT * FROM projects WHERE slug = ?`).get(slug);
+      return row ? hydrateProject(row) : null;
+    },
+    saveSetupSession(session) {
+      const existing = this.getSetupSession(session.id);
+      if (existing) {
+        db.prepare(`
+          UPDATE setup_sessions
+          SET created_at = ?,
+              updated_at = ?,
+              project_id = ?,
+              actor_json = ?,
+              target_json = ?,
+              state_json = ?,
+              status = ?,
+              metadata_json = ?
+          WHERE id = ?
+        `).run(
+          session.createdAt,
+          session.updatedAt,
+          session.projectId,
+          JSON.stringify(session.actor ?? {}),
+          JSON.stringify(session.target ?? {}),
+          JSON.stringify(session.state ?? {}),
+          session.status,
+          JSON.stringify(session.metadata ?? {}),
+          session.id,
+        );
+        return this.getSetupSession(session.id);
+      }
+      db.prepare(`
+        INSERT INTO setup_sessions (
+          id, created_at, updated_at, project_id, actor_json, target_json, state_json, status, metadata_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        session.id,
+        session.createdAt,
+        session.updatedAt,
+        session.projectId,
+        JSON.stringify(session.actor ?? {}),
+        JSON.stringify(session.target ?? {}),
+        JSON.stringify(session.state ?? {}),
+        session.status,
+        JSON.stringify(session.metadata ?? {}),
+      );
+      return this.getSetupSession(session.id);
+    },
+    getSetupSession(id) {
+      const row = db.prepare(`SELECT * FROM setup_sessions WHERE id = ?`).get(id);
+      return row ? hydrateSetupSession(row) : null;
+    },
+    listSetupSessions(projectId = '') {
+      const rows = projectId
+        ? db.prepare(`SELECT * FROM setup_sessions WHERE project_id = ? ORDER BY created_at DESC`).all(projectId)
+        : db.prepare(`SELECT * FROM setup_sessions ORDER BY created_at DESC`).all();
+      return rows.map(hydrateSetupSession);
     },
     upsertCase(caseRecord, fingerprint) {
       const resolvedFingerprint = fingerprint ?? caseRecord?.clustering?.fingerprint ?? caseRecord?.id;
@@ -465,5 +618,34 @@ function hydrateDelegation(row) {
     target: JSON.parse(row.target_json),
     request: JSON.parse(row.request_json),
     result: JSON.parse(row.result_json),
+  };
+}
+
+function hydrateProject(row) {
+  return {
+    id: row.id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    name: row.name,
+    slug: row.slug,
+    projectKey: row.project_key,
+    appName: row.app_name,
+    repo: JSON.parse(row.repo_json),
+    status: row.status,
+    metadata: JSON.parse(row.metadata_json),
+  };
+}
+
+function hydrateSetupSession(row) {
+  return {
+    id: row.id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    projectId: row.project_id,
+    actor: JSON.parse(row.actor_json),
+    target: JSON.parse(row.target_json),
+    state: JSON.parse(row.state_json),
+    status: row.status,
+    metadata: JSON.parse(row.metadata_json),
   };
 }
