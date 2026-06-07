@@ -84,6 +84,7 @@ Trust signals:
 - [Omni Lingua Case Study](./docs/case-studies/omni-lingua.md)
 - [Reader Feedback Examples](./docs/case-studies/reader-feedback-to-case-examples.md)
 - [Quick Start](./docs/quick-start.md)
+- [One-Click Adoption Plan](./docs/one-click-adoption-plan.md)
 - [Release Notes](./docs/releases/v0.1.0.md)
 - [Changelog](./CHANGELOG.md)
 - [Security Policy](./SECURITY.md)
@@ -415,6 +416,7 @@ They need fast integration, a GitHub-native workflow, and a system that starts c
 - `docs/case-studies/reader-feedback-to-case-examples.md`
 - `docs/case-studies/social-snippets.md`
 - `docs/quick-start.md`
+- `docs/one-click-adoption-plan.md`
 - `docs/object-model.md`
 - `docs/api-contract.md`
 - `docs/github-flow.md`

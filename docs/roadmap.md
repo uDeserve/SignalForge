@@ -62,6 +62,8 @@ Current progress:
 - easier hosted or self-serve setup paths
 - sane defaults for small teams
 - simpler onboarding flows that feel close to one-click
+- GitHub App installation discovery and connection state
+- one-click verification for publish and decision sync readiness
 
 ## Phase 7: Downstream Execution
 
@@ -77,3 +79,7 @@ SignalForge feels mature when a small team can:
 2. install the GitHub App into the repo
 3. let the bot publish and sync decisions reliably
 4. operate without needing a second internal triage system
+
+See also:
+
+- `docs/one-click-adoption-plan.md`

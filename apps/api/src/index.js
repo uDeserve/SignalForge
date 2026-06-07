@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
@@ -25,6 +26,7 @@ import {
   parseOwnerCommand,
 } from '../../../packages/github-bridge/src/index.js';
 import { DelegationKind, DelegationStatus } from '../../../packages/core/src/index.js';
+import { evaluateSetupStatus } from '../../../packages/shared-config/src/index.js';
 
 const DEFAULT_POLICY = Object.freeze({
   publishBias: 'lenient',
@@ -316,6 +318,8 @@ export function createSignalForgeApi({
   logger = console,
   triageEngine = createTriageEngine({ logger }),
   githubPublisher = createPreviewGitHubPublisher(),
+  env = process.env,
+  repoRoot = fileURLToPath(new URL('../../..', import.meta.url)),
 } = {}) {
   async function maybeAutoPublish(caseRecord) {
     if (
@@ -413,6 +417,15 @@ export function createSignalForgeApi({
     try {
       if (method === 'GET' && url === '/health') {
         return { statusCode: 200, body: { ok: true } };
+      }
+
+      if (method === 'GET' && url === '/setup/status') {
+        const status = await evaluateSetupStatus({
+          env,
+          repoRoot,
+          fileSystem: fs,
+        });
+        return { statusCode: 200, body: status };
       }
 
       if (method === 'POST' && url === '/submissions') {

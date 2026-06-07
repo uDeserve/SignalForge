@@ -1,21 +1,89 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const repoRoot = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const cliPath = path.resolve(repoRoot, 'scripts', 'signalforge_cli.mjs');
 const envExample = path.resolve(repoRoot, '.env.example');
+const isolatedEnvKeys = Object.freeze([
+  'DEEPSEEK_API_KEY',
+  'GITHUB_PUBLISHER',
+  'GITHUB_TOKEN',
+  'GITHUB_APP_ID',
+  'GITHUB_APP_INSTALLATION_ID',
+  'GITHUB_APP_INSTALLATION_TOKEN',
+  'GITHUB_APP_PRIVATE_KEY',
+  'GITHUB_WEBHOOK_SECRET',
+  'SIGNALFORGE_DB_PATH',
+  'SIGNALFORGE_E2E_REPO',
+  'SIGNALFORGE_ENV_FILE',
+  'SIGNALFORGE_ENV_EXAMPLE_FILE',
+]);
 
-function runCli(args, { cwd, env } = {}) {
-  return spawnSync(process.execPath, [cliPath, ...args], {
-    cwd,
-    env: { ...process.env, ...env },
-    encoding: 'utf8',
-  });
+let importCounter = 0;
+
+async function runCli(args, { cwd, env } = {}) {
+  const previousArgv = [...process.argv];
+  const previousCwd = process.cwd();
+  const previousExitCode = process.exitCode;
+  const previousLog = console.log;
+  const previousError = console.error;
+  const stdout = [];
+  const stderr = [];
+  const envPatch = { ...(env ?? {}) };
+  const previousEnv = {};
+
+  for (const key of isolatedEnvKeys) {
+    previousEnv[key] = process.env[key];
+  }
+
+  console.log = (...values) => {
+    stdout.push(values.join(' '));
+  };
+  console.error = (...values) => {
+    stderr.push(values.join(' '));
+  };
+  process.argv = [process.execPath, cliPath, ...args];
+  process.exitCode = undefined;
+  if (cwd) process.chdir(cwd);
+
+  for (const key of isolatedEnvKeys) {
+    delete process.env[key];
+  }
+
+  for (const [key, value] of Object.entries(envPatch)) {
+    process.env[key] = String(value);
+  }
+
+  try {
+    await import(`${pathToFileURL(cliPath).href}?test_run=${importCounter++}`);
+    return {
+      status: process.exitCode ?? 0,
+      stdout: stdout.length ? `${stdout.join('\n')}\n` : '',
+      stderr: stderr.length ? `${stderr.join('\n')}\n` : '',
+    };
+  } catch (error) {
+    return {
+      status: process.exitCode ?? 1,
+      stdout: stdout.length ? `${stdout.join('\n')}\n` : '',
+      stderr: stderr.length ? `${stderr.join('\n')}\n` : '',
+      error,
+    };
+  } finally {
+    process.argv = previousArgv;
+    if (cwd) process.chdir(previousCwd);
+    process.exitCode = previousExitCode;
+    console.log = previousLog;
+    console.error = previousError;
+
+    for (const [key, value] of Object.entries(previousEnv)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
 }
 
 function createFixture() {
@@ -24,9 +92,9 @@ function createFixture() {
   return dir;
 }
 
-test('signalforge cli init creates .env from example', () => {
+test('signalforge cli init creates .env from example', async () => {
   const fixture = createFixture();
-  const result = runCli(['init'], {
+  const result = await runCli(['init'], {
     cwd: repoRoot,
     env: {
       SIGNALFORGE_ENV_FILE: path.join(fixture, '.env'),
@@ -38,10 +106,10 @@ test('signalforge cli init creates .env from example', () => {
   assert.equal(fs.existsSync(path.join(fixture, '.env')), true);
 });
 
-test('signalforge cli doctor reports preview mode readiness with default env', () => {
+test('signalforge cli doctor reports preview mode readiness with default env', async () => {
   const fixture = createFixture();
   fs.copyFileSync(envExample, path.join(fixture, '.env'));
-  const result = runCli(['doctor'], {
+  const result = await runCli(['doctor'], {
     cwd: repoRoot,
     env: {
       SIGNALFORGE_ENV_FILE: path.join(fixture, '.env'),
@@ -54,14 +122,14 @@ test('signalforge cli doctor reports preview mode readiness with default env', (
   assert.match(result.stdout, /GitHub App trial ready: no/);
 });
 
-test('signalforge cli doctor reports missing github app config when app mode is selected', () => {
+test('signalforge cli doctor reports missing github app config when app mode is selected', async () => {
   const fixture = createFixture();
   fs.writeFileSync(
     path.join(fixture, '.env'),
     'GITHUB_PUBLISHER=app\nGITHUB_APP_ID=\nGITHUB_APP_INSTALLATION_ID=\nGITHUB_APP_PRIVATE_KEY=\n',
     'utf8',
   );
-  const result = runCli(['doctor'], {
+  const result = await runCli(['doctor'], {
     cwd: repoRoot,
     env: {
       SIGNALFORGE_ENV_FILE: path.join(fixture, '.env'),
@@ -74,7 +142,7 @@ test('signalforge cli doctor reports missing github app config when app mode is 
   assert.match(result.stdout, /Finish GitHub App env setup/);
 });
 
-test('signalforge cli doctor reports app workflow gaps beyond auth', () => {
+test('signalforge cli doctor reports app workflow gaps beyond auth', async () => {
   const fixture = createFixture();
   fs.writeFileSync(
     path.join(fixture, '.env'),
@@ -87,7 +155,7 @@ test('signalforge cli doctor reports app workflow gaps beyond auth', () => {
     ].join('\n'),
     'utf8',
   );
-  const result = runCli(['doctor'], {
+  const result = await runCli(['doctor'], {
     cwd: repoRoot,
     env: {
       SIGNALFORGE_ENV_FILE: path.join(fixture, '.env'),
@@ -101,10 +169,10 @@ test('signalforge cli doctor reports app workflow gaps beyond auth', () => {
   assert.match(result.stdout, /webhook-based decision sync is still incomplete/i);
 });
 
-test('signalforge cli doctor supports machine-readable json output', () => {
+test('signalforge cli doctor supports machine-readable json output', async () => {
   const fixture = createFixture();
   fs.copyFileSync(envExample, path.join(fixture, '.env'));
-  const result = runCli(['doctor', '--json'], {
+  const result = await runCli(['doctor', '--json'], {
     cwd: repoRoot,
     env: {
       SIGNALFORGE_ENV_FILE: path.join(fixture, '.env'),
@@ -113,13 +181,15 @@ test('signalforge cli doctor supports machine-readable json output', () => {
   });
   assert.equal(result.status, 0);
   const parsed = JSON.parse(result.stdout);
-  assert.equal(parsed.schemaVersion, 1);
+  assert.equal(parsed.schemaVersion, 2);
   assert.equal(parsed.publisherMode, 'preview');
+  assert.equal(typeof parsed.setupStages, 'object');
+  assert.equal(parsed.setupStages.appConnected, true);
   assert.equal(Array.isArray(parsed.checks), true);
 });
 
-test('signalforge cli manifest emits an agent-readable setup contract', () => {
-  const result = runCli(['manifest'], { cwd: repoRoot });
+test('signalforge cli manifest emits an agent-readable setup contract', async () => {
+  const result = await runCli(['manifest'], { cwd: repoRoot });
   assert.equal(result.status, 0);
   const parsed = JSON.parse(result.stdout);
   assert.equal(parsed.product, 'SignalForge');
@@ -127,8 +197,8 @@ test('signalforge cli manifest emits an agent-readable setup contract', () => {
   assert.equal(Array.isArray(parsed.installModes), true);
 });
 
-test('signalforge cli integration emits an agent-readable integration contract', () => {
-  const result = runCli(['integration'], { cwd: repoRoot });
+test('signalforge cli integration emits an agent-readable integration contract', async () => {
+  const result = await runCli(['integration'], { cwd: repoRoot });
   assert.equal(result.status, 0);
   const parsed = JSON.parse(result.stdout);
   assert.equal(parsed.product, 'SignalForge');
@@ -136,8 +206,8 @@ test('signalforge cli integration emits an agent-readable integration contract',
   assert.equal(parsed.integrationModes[0].export, 'installSignalForgePreset');
 });
 
-test('signalforge cli scaffold emits a machine-readable template payload', () => {
-  const result = runCli(['scaffold', 'browser-preset', '--json'], { cwd: repoRoot });
+test('signalforge cli scaffold emits a machine-readable template payload', async () => {
+  const result = await runCli(['scaffold', 'browser-preset', '--json'], { cwd: repoRoot });
   assert.equal(result.status, 0);
   const parsed = JSON.parse(result.stdout);
   assert.equal(parsed.templateId, 'browser-preset');
@@ -145,10 +215,10 @@ test('signalforge cli scaffold emits a machine-readable template payload', () =>
   assert.equal(parsed.files.some((file) => file.path === 'main.js'), true);
 });
 
-test('signalforge cli scaffold can write template files to disk', () => {
+test('signalforge cli scaffold can write template files to disk', async () => {
   const fixture = createFixture();
   const outputDir = path.join(fixture, 'scaffold-out');
-  const result = runCli(['scaffold', 'react-preset', '--output', outputDir], { cwd: repoRoot });
+  const result = await runCli(['scaffold', 'react-preset', '--output', outputDir], { cwd: repoRoot });
   assert.equal(result.status, 0);
   assert.equal(fs.existsSync(path.join(outputDir, 'AppShell.jsx')), true);
   assert.equal(fs.existsSync(path.join(outputDir, 'client-entry.jsx')), true);

@@ -221,6 +221,29 @@ test('api keeps dissimilar submissions in separate cases', async () => {
   assert.notEqual(first.id, second.id);
 });
 
+test('api exposes shared setup status for install and verification flows', async () => {
+  const api = createSignalForgeApi({
+    store: createStore(':memory:'),
+    logger: { error() {}, warn() {} },
+    env: { GITHUB_PUBLISHER: 'preview' },
+    repoRoot: '/tmp/signalforge-setup-status-test',
+  });
+
+  const response = await api.handleRequest({
+    method: 'GET',
+    url: '/setup/status',
+    body: {},
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.body.schemaVersion, 2);
+  assert.equal(response.body.publisherMode, 'preview');
+  assert.equal(typeof response.body.setupStages, 'object');
+  assert.equal(response.body.setupStages.appConnected, false);
+  assert.equal(response.body.existingWebAppTrialReady, false);
+  assert.equal(Array.isArray(response.body.checks), true);
+});
+
 test('aggregated case updates evidence counts timestamps and linked submissions', async () => {
   const api = createSignalForgeApi({ store: createStore(':memory:'), logger: { error() {}, warn() {} } });
 
