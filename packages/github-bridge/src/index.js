@@ -4,6 +4,8 @@ import {
   PublicationTarget,
 } from '../../core/src/index.js';
 
+const GITHUB_API_VERSION = '2022-11-28';
+
 function normalizeLabel(label) {
   return String(label ?? '').trim().toLowerCase();
 }
@@ -235,6 +237,42 @@ export function parseGitHubRepo(input, fallback = 'org/repo') {
   };
 }
 
+function createGitHubApiHeaders({ token, userAgent = 'SignalForge/0.1.0' }) {
+  return {
+    Accept: 'application/vnd.github+json',
+    Authorization: `Bearer ${token}`,
+    'User-Agent': userAgent,
+    'X-GitHub-Api-Version': GITHUB_API_VERSION,
+  };
+}
+
+function normalizeGitHubAppInstallation(payload, repo = '') {
+  const events = Array.isArray(payload?.events) ? payload.events : [];
+  const permissions = payload?.permissions ?? {};
+  const issuesPermission = String(permissions.issues ?? '').trim().toLowerCase();
+  const metadataPermission = String(permissions.metadata ?? '').trim().toLowerCase();
+
+  return {
+    installed: true,
+    installationId: String(payload?.id ?? ''),
+    appId: String(payload?.app_id ?? ''),
+    appSlug: String(payload?.app_slug ?? ''),
+    accountLogin: String(payload?.account?.login ?? ''),
+    targetType: String(payload?.target_type ?? payload?.account?.type ?? ''),
+    repositorySelection: String(payload?.repository_selection ?? ''),
+    permissions,
+    events,
+    htmlUrl: String(payload?.html_url ?? ''),
+    repo: repo ? parseGitHubRepo(repo).fullName : '',
+    hasIssuesEvent: events.includes('issues'),
+    hasIssueCommentEvent: events.includes('issue_comment'),
+    hasRequiredPermissions:
+      (issuesPermission === 'write' || issuesPermission === 'admin') &&
+      ['read', 'write', 'admin'].includes(metadataPermission),
+    hasRequiredEvents: events.includes('issues') && events.includes('issue_comment'),
+  };
+}
+
 export function createPreviewGitHubPublisher() {
   return {
     kind: 'preview',
@@ -444,6 +482,135 @@ export async function createGitHubAppJwt({
   return `${signingInput}.${base64UrlEncode(Buffer.from(signature))}`;
 }
 
+export async function getGitHubAppInstallationForRepo({
+  appId,
+  privateKeyPem,
+  repo,
+  apiBaseUrl = 'https://api.github.com',
+  fetchImpl = globalThis.fetch,
+  userAgent = 'SignalForge/0.1.0',
+} = {}) {
+  if (!appId) {
+    throw new Error('github app id is required');
+  }
+  if (!privateKeyPem) {
+    throw new Error('github app private key is required');
+  }
+  if (!repo) {
+    throw new Error('github repo is required for installation discovery');
+  }
+  if (typeof fetchImpl !== 'function') {
+    throw new Error('fetch implementation is required for github app installation discovery');
+  }
+
+  const jwt = await createGitHubAppJwt({ appId, privateKeyPem });
+  const resolvedRepo = parseGitHubRepo(repo);
+  const normalizedBaseUrl = String(apiBaseUrl).replace(/\/$/, '');
+  const response = await fetchImpl(
+    `${normalizedBaseUrl}/repos/${resolvedRepo.owner}/${resolvedRepo.repo}/installation`,
+    {
+      method: 'GET',
+      headers: createGitHubApiHeaders({ token: jwt, userAgent }),
+    },
+  );
+
+  if (response.status === 404) {
+    return null;
+  }
+  if (!response.ok) {
+    const message = await response.text().catch(() => '');
+    throw new Error(`github app installation discovery failed: ${response.status} ${message}`.trim());
+  }
+
+  return normalizeGitHubAppInstallation(await response.json(), resolvedRepo.fullName);
+}
+
+export async function getGitHubAppInstallationById({
+  appId,
+  privateKeyPem,
+  installationId,
+  apiBaseUrl = 'https://api.github.com',
+  fetchImpl = globalThis.fetch,
+  userAgent = 'SignalForge/0.1.0',
+} = {}) {
+  if (!appId) {
+    throw new Error('github app id is required');
+  }
+  if (!privateKeyPem) {
+    throw new Error('github app private key is required');
+  }
+  if (!installationId) {
+    throw new Error('github app installation id is required');
+  }
+  if (typeof fetchImpl !== 'function') {
+    throw new Error('fetch implementation is required for github app installation lookup');
+  }
+
+  const jwt = await createGitHubAppJwt({ appId, privateKeyPem });
+  const normalizedBaseUrl = String(apiBaseUrl).replace(/\/$/, '');
+  const response = await fetchImpl(
+    `${normalizedBaseUrl}/app/installations/${installationId}`,
+    {
+      method: 'GET',
+      headers: createGitHubApiHeaders({ token: jwt, userAgent }),
+    },
+  );
+
+  if (response.status === 404) {
+    return null;
+  }
+  if (!response.ok) {
+    const message = await response.text().catch(() => '');
+    throw new Error(`github app installation lookup failed: ${response.status} ${message}`.trim());
+  }
+
+  return normalizeGitHubAppInstallation(await response.json());
+}
+
+async function exchangeGitHubAppInstallationToken({
+  appId,
+  privateKeyPem,
+  installationId = '',
+  apiBaseUrl = 'https://api.github.com',
+  fetchImpl = globalThis.fetch,
+  userAgent = 'SignalForge/0.1.0',
+} = {}) {
+  if (!appId) {
+    throw new Error('github app id is required');
+  }
+  if (!privateKeyPem) {
+    throw new Error('github app private key is required');
+  }
+  if (!installationId) {
+    throw new Error('github app installation id is required');
+  }
+  if (typeof fetchImpl !== 'function') {
+    throw new Error('fetch implementation is required for github app installation token provider');
+  }
+
+  const jwt = await createGitHubAppJwt({ appId, privateKeyPem });
+  const normalizedBaseUrl = String(apiBaseUrl).replace(/\/$/, '');
+  const response = await fetchImpl(
+    `${normalizedBaseUrl}/app/installations/${installationId}/access_tokens`,
+    {
+      method: 'POST',
+      headers: createGitHubApiHeaders({ token: jwt, userAgent }),
+    },
+  );
+
+  if (!response.ok) {
+    const message = await response.text().catch(() => '');
+    throw new Error(`github app installation token exchange failed: ${response.status} ${message}`.trim());
+  }
+
+  const tokenResponse = await response.json();
+  return {
+    token: tokenResponse.token,
+    installationId: String(installationId),
+    expiresAt: tokenResponse.expires_at ?? '',
+  };
+}
+
 export function createJwtGitHubAppInstallationTokenProvider({
   appId,
   privateKeyPem,
@@ -465,35 +632,68 @@ export function createJwtGitHubAppInstallationTokenProvider({
     throw new Error('fetch implementation is required for github app installation token provider');
   }
 
-  const normalizedBaseUrl = String(apiBaseUrl).replace(/\/$/, '');
-
   return {
     kind: 'jwt_installation_token',
     async getInstallationToken() {
-      const jwt = await createGitHubAppJwt({ appId, privateKeyPem });
-      const response = await fetchImpl(
-        `${normalizedBaseUrl}/app/installations/${installationId}/access_tokens`,
-        {
-          method: 'POST',
-          headers: {
-            Accept: 'application/vnd.github+json',
-            Authorization: `Bearer ${jwt}`,
-            'User-Agent': userAgent,
-          },
-        },
-      );
+      return exchangeGitHubAppInstallationToken({
+        appId,
+        privateKeyPem,
+        installationId,
+        apiBaseUrl,
+        fetchImpl,
+        userAgent,
+      });
+    },
+  };
+}
 
-      if (!response.ok) {
-        const message = await response.text().catch(() => '');
-        throw new Error(`github app installation token exchange failed: ${response.status} ${message}`.trim());
+export function createRepoAwareJwtGitHubAppInstallationTokenProvider({
+  appId,
+  privateKeyPem,
+  installationId = '',
+  apiBaseUrl = 'https://api.github.com',
+  fetchImpl = globalThis.fetch,
+  userAgent = 'SignalForge/0.1.0',
+} = {}) {
+  if (!appId) {
+    throw new Error('github app id is required');
+  }
+  if (!privateKeyPem) {
+    throw new Error('github app private key is required');
+  }
+  if (typeof fetchImpl !== 'function') {
+    throw new Error('fetch implementation is required for github app installation token provider');
+  }
+
+  return {
+    kind: 'jwt_installation_token_repo_aware',
+    async getInstallationToken({ repo } = {}) {
+      let resolvedInstallationId = String(installationId ?? '').trim();
+      if (!resolvedInstallationId) {
+        if (!repo) {
+          throw new Error('github app installation id or target repo is required');
+        }
+        const installation = await getGitHubAppInstallationForRepo({
+          appId,
+          privateKeyPem,
+          repo,
+          apiBaseUrl,
+          fetchImpl,
+          userAgent,
+        });
+        if (!installation?.installationId) {
+          throw new Error(`github app is not installed on ${repo}`);
+        }
+        resolvedInstallationId = installation.installationId;
       }
-
-      const tokenResponse = await response.json();
-      return {
-        token: tokenResponse.token,
-        installationId: String(installationId),
-        expiresAt: tokenResponse.expires_at ?? '',
-      };
+      return exchangeGitHubAppInstallationToken({
+        appId,
+        privateKeyPem,
+        installationId: resolvedInstallationId,
+        apiBaseUrl,
+        fetchImpl,
+        userAgent,
+      });
     },
   };
 }
@@ -510,10 +710,10 @@ export function createGitHubPublisherFromEnv(env = process.env) {
     });
   }
   if (publisherMode === 'app') {
-    const hasJwtInputs = Boolean(env.GITHUB_APP_ID && env.GITHUB_APP_PRIVATE_KEY && env.GITHUB_APP_INSTALLATION_ID);
+    const hasJwtInputs = Boolean(env.GITHUB_APP_ID && env.GITHUB_APP_PRIVATE_KEY);
     return createGitHubAppPublisher({
       installationTokenProvider: hasJwtInputs
-        ? createJwtGitHubAppInstallationTokenProvider({
+        ? createRepoAwareJwtGitHubAppInstallationTokenProvider({
             appId: env.GITHUB_APP_ID,
             privateKeyPem: env.GITHUB_APP_PRIVATE_KEY,
             installationId: env.GITHUB_APP_INSTALLATION_ID,

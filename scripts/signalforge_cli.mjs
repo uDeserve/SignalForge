@@ -118,6 +118,12 @@ function printDoctor(result) {
   }
   if (result.publisherMode === 'app') {
     console.log(`Webhook secret configured: ${result.webhookSecretConfigured ? 'yes' : 'no'}`);
+    if (result.githubAppConnection?.installation?.installationId) {
+      console.log(`Discovered installation: ${result.githubAppConnection.installation.installationId}`);
+    }
+    if (result.githubAppConnection?.installation?.repo) {
+      console.log(`Connected repository: ${result.githubAppConnection.installation.repo}`);
+    }
   }
   console.log('');
   console.log('Setup stages:');

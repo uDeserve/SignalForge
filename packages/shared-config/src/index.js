@@ -3,5 +3,6 @@ export {
   canCreateGitHubPublisher,
   checkField,
   evaluateSetupStatus,
+  hasFile,
   readString,
 } from './setup-status.js';

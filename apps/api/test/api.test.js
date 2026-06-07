@@ -7,8 +7,10 @@ import { createTriageEngine, triageSubmission, triageRuntimeEvent, validateTriag
 import { createDeepSeekSubmissionAnalyzer } from '../../../packages/triage/src/deepseek.js';
 import {
   createGitHubAppJwt,
+  getGitHubAppInstallationForRepo,
   createGitHubAppPublisher,
   createGitHubPublisherFromEnv,
+  createRepoAwareJwtGitHubAppInstallationTokenProvider,
   createJwtGitHubAppInstallationTokenProvider,
   buildIssueBody,
   createPatGitHubPublisher,
@@ -241,6 +243,7 @@ test('api exposes shared setup status for install and verification flows', async
   assert.equal(typeof response.body.setupStages, 'object');
   assert.equal(response.body.setupStages.appConnected, false);
   assert.equal(response.body.existingWebAppTrialReady, false);
+  assert.equal(response.body.githubAppConnection.mode, 'not_app');
   assert.equal(Array.isArray(response.body.checks), true);
 });
 
@@ -640,11 +643,103 @@ test('jwt installation token provider exchanges app jwt for installation token',
   assert.equal(installation.token, 'installation_token_from_exchange');
 });
 
+test('github app installation lookup can discover installation by repo', async () => {
+  const { privateKey } = await import('node:crypto').then(({ generateKeyPairSync }) =>
+    generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+    }),
+  );
+
+  let request;
+  const installation = await getGitHubAppInstallationForRepo({
+    appId: '123456',
+    privateKeyPem: privateKey,
+    repo: 'uDeserve/signalforge-e2e-lab',
+    apiBaseUrl: 'https://api.github.test',
+    fetchImpl: async (url, init) => {
+      request = { url, init };
+      return {
+        ok: true,
+        async json() {
+          return {
+            id: 999,
+            app_id: 123456,
+            app_slug: 'signalforge',
+            repository_selection: 'selected',
+            permissions: { issues: 'write', metadata: 'read' },
+            events: ['issues', 'issue_comment'],
+            account: { login: 'uDeserve', type: 'Organization' },
+          };
+        },
+      };
+    },
+  });
+
+  assert.equal(request.url, 'https://api.github.test/repos/uDeserve/signalforge-e2e-lab/installation');
+  assert.equal(request.init.method, 'GET');
+  assert.equal(installation.installationId, '999');
+  assert.equal(installation.repo, 'uDeserve/signalforge-e2e-lab');
+  assert.equal(installation.hasRequiredPermissions, true);
+  assert.equal(installation.hasRequiredEvents, true);
+});
+
+test('repo-aware jwt installation token provider can auto-discover installation id from repo', async () => {
+  const { privateKey } = await import('node:crypto').then(({ generateKeyPairSync }) =>
+    generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+    }),
+  );
+
+  const requests = [];
+  const provider = createRepoAwareJwtGitHubAppInstallationTokenProvider({
+    appId: '123456',
+    privateKeyPem: privateKey,
+    apiBaseUrl: 'https://api.github.test',
+    fetchImpl: async (url, init) => {
+      requests.push({ url, init });
+      if (url.endsWith('/repos/uDeserve/signalforge-e2e-lab/installation')) {
+        return {
+          ok: true,
+          async json() {
+            return {
+              id: 999,
+              app_id: 123456,
+              repository_selection: 'selected',
+              permissions: { issues: 'write', metadata: 'read' },
+              events: ['issues', 'issue_comment'],
+              account: { login: 'uDeserve', type: 'Organization' },
+            };
+          },
+        };
+      }
+      return {
+        ok: true,
+        async json() {
+          return {
+            token: 'installation_token_from_auto_discovery',
+            expires_at: '2026-05-28T12:00:00Z',
+          };
+        },
+      };
+    },
+  });
+
+  const installation = await provider.getInstallationToken({ repo: 'uDeserve/signalforge-e2e-lab' });
+  assert.equal(requests.length, 2);
+  assert.equal(requests[0].url, 'https://api.github.test/repos/uDeserve/signalforge-e2e-lab/installation');
+  assert.equal(requests[1].url, 'https://api.github.test/app/installations/999/access_tokens');
+  assert.equal(installation.token, 'installation_token_from_auto_discovery');
+  assert.equal(installation.installationId, '999');
+});
+
 test('github publisher from env prefers jwt app provider when full app credentials are present', () => {
   const publisher = createGitHubPublisherFromEnv({
     GITHUB_PUBLISHER: 'app',
     GITHUB_APP_ID: '123456',
-    GITHUB_APP_INSTALLATION_ID: '999',
     GITHUB_APP_PRIVATE_KEY: '-----BEGIN PRIVATE KEY-----\nZmFrZQ==\n-----END PRIVATE KEY-----',
     GITHUB_API_BASE_URL: 'https://api.github.test',
   });

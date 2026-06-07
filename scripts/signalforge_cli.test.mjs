@@ -25,12 +25,13 @@ const isolatedEnvKeys = Object.freeze([
 
 let importCounter = 0;
 
-async function runCli(args, { cwd, env } = {}) {
+async function runCli(args, { cwd, env, fetchImpl } = {}) {
   const previousArgv = [...process.argv];
   const previousCwd = process.cwd();
   const previousExitCode = process.exitCode;
   const previousLog = console.log;
   const previousError = console.error;
+  const previousFetch = globalThis.fetch;
   const stdout = [];
   const stderr = [];
   const envPatch = { ...(env ?? {}) };
@@ -57,6 +58,9 @@ async function runCli(args, { cwd, env } = {}) {
   for (const [key, value] of Object.entries(envPatch)) {
     process.env[key] = String(value);
   }
+  if (fetchImpl) {
+    globalThis.fetch = fetchImpl;
+  }
 
   try {
     await import(`${pathToFileURL(cliPath).href}?test_run=${importCounter++}`);
@@ -78,6 +82,7 @@ async function runCli(args, { cwd, env } = {}) {
     process.exitCode = previousExitCode;
     console.log = previousLog;
     console.error = previousError;
+    globalThis.fetch = previousFetch;
 
     for (const [key, value] of Object.entries(previousEnv)) {
       if (value === undefined) delete process.env[key];
@@ -167,6 +172,63 @@ test('signalforge cli doctor reports app workflow gaps beyond auth', async () =>
   assert.match(result.stdout, /E2E repository: owner\/repo/);
   assert.match(result.stdout, /Webhook secret configured: no/);
   assert.match(result.stdout, /webhook-based decision sync is still incomplete/i);
+});
+
+test('signalforge cli doctor json reports discovered github app connection metadata', async () => {
+  const fixture = createFixture();
+  const { privateKey } = await import('node:crypto').then(({ generateKeyPairSync }) =>
+    generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+    }),
+  );
+  fs.writeFileSync(
+    path.join(fixture, '.env'),
+    [
+      'GITHUB_PUBLISHER=app',
+    ].join('\n'),
+    'utf8',
+  );
+
+  const result = await runCli(['doctor', '--json'], {
+    cwd: repoRoot,
+    env: {
+      SIGNALFORGE_ENV_FILE: path.join(fixture, '.env'),
+      SIGNALFORGE_ENV_EXAMPLE_FILE: path.join(fixture, '.env.example'),
+      GITHUB_PUBLISHER: 'app',
+      GITHUB_APP_ID: '123',
+      GITHUB_APP_PRIVATE_KEY: privateKey,
+      SIGNALFORGE_E2E_REPO: 'uDeserve/signalforge-e2e-lab',
+    },
+    fetchImpl: async (url) => {
+      if (String(url).endsWith('/repos/uDeserve/signalforge-e2e-lab/installation')) {
+        return {
+          ok: true,
+          async json() {
+            return {
+              id: 999,
+              app_id: 123,
+              app_slug: 'signalforge',
+              repository_selection: 'selected',
+              permissions: { issues: 'write', metadata: 'read' },
+              events: ['issues', 'issue_comment'],
+              account: { login: 'uDeserve', type: 'Organization' },
+            };
+          },
+        };
+      }
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    },
+  });
+
+  assert.equal(result.status, 0);
+  const parsed = JSON.parse(result.stdout);
+  assert.equal(parsed.publisherMode, 'app');
+  assert.equal(typeof parsed.githubAppConnection, 'object');
+  assert.equal(parsed.githubAppConnection.discovered, true);
+  assert.equal(parsed.githubAppConnection.installation.installationId, '999');
+  assert.equal(parsed.githubAppConnection.installation.repo, 'uDeserve/signalforge-e2e-lab');
 });
 
 test('signalforge cli doctor supports machine-readable json output', async () => {

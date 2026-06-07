@@ -22,22 +22,82 @@ export async function canCreateGitHubPublisher(env) {
   }
 }
 
+async function discoverGitHubAppConnection(env) {
+  const repo = readString(env, 'SIGNALFORGE_E2E_REPO');
+  const appId = readString(env, 'GITHUB_APP_ID');
+  const privateKeyPem = readString(env, 'GITHUB_APP_PRIVATE_KEY');
+  const installationId = readString(env, 'GITHUB_APP_INSTALLATION_ID');
+  const apiBaseUrl = readString(env, 'GITHUB_API_BASE_URL', 'https://api.github.com');
+
+  if (!appId || !privateKeyPem) {
+    return {
+      mode: 'unavailable',
+      repo,
+      discovered: false,
+      installation: null,
+      errors: [],
+    };
+  }
+
+  try {
+    const mod = await import('../../github-bridge/src/index.js');
+    let installation = null;
+
+    if (repo) {
+      installation = await mod.getGitHubAppInstallationForRepo({
+        appId,
+        privateKeyPem,
+        repo,
+        apiBaseUrl,
+      });
+    } else if (installationId) {
+      installation = await mod.getGitHubAppInstallationById({
+        appId,
+        privateKeyPem,
+        installationId,
+        apiBaseUrl,
+      });
+    }
+
+    return {
+      mode: repo ? 'repo_lookup' : installationId ? 'id_lookup' : 'auth_only',
+      repo,
+      discovered: Boolean(installation?.installationId),
+      installation,
+      errors: [],
+    };
+  } catch (error) {
+    return {
+      mode: repo ? 'repo_lookup' : installationId ? 'id_lookup' : 'auth_only',
+      repo,
+      discovered: false,
+      installation: null,
+      errors: [String(error?.message ?? error)],
+    };
+  }
+}
+
 function buildSetupStages({
   publisherMode,
   checks,
   e2eRepo,
   webhookSecretConfigured,
+  connection,
 }) {
   const byId = new Map(checks.map((check) => [check.id, check]));
   const hasEnvFile = Boolean(byId.get('env-file')?.ok);
   const hasPublisherMode = Boolean(byId.get('publisher-mode')?.ok);
   const hasGithubAppAuth = Boolean(byId.get('github-app-auth')?.ok);
-  const hasGithubAppInstallationId = Boolean(byId.get('github-app-installation-id')?.ok);
+  const hasGithubAppInstallationId =
+    Boolean(byId.get('github-app-installation-id')?.ok) || Boolean(connection?.installation?.installationId);
+  const hasRepoConnection = publisherMode === 'preview'
+    ? true
+    : Boolean(connection?.installation?.repo || e2eRepo);
 
   return {
     envFileReady: hasEnvFile,
     appConnected: hasEnvFile && hasPublisherMode,
-    repoConnected: publisherMode === 'preview' ? true : Boolean(e2eRepo),
+    repoConnected: hasRepoConnection,
     githubAppInstalled: publisherMode === 'app' ? hasGithubAppInstallationId : false,
     authReady:
       publisherMode === 'preview'
@@ -51,8 +111,11 @@ function buildSetupStages({
         ? hasEnvFile && hasPublisherMode
         : publisherMode === 'pat'
           ? Boolean(byId.get('github-token')?.ok)
-          : hasGithubAppAuth && hasGithubAppInstallationId,
-    decisionSyncReady: publisherMode === 'app' ? webhookSecretConfigured : false,
+          : hasGithubAppAuth && hasGithubAppInstallationId && hasRepoConnection,
+    decisionSyncReady:
+      publisherMode === 'app'
+        ? webhookSecretConfigured && Boolean(connection?.installation?.hasRequiredEvents)
+        : false,
   };
 }
 
@@ -77,6 +140,9 @@ export async function evaluateSetupStatus({
   const hasGitHubPatE2E = hasFile(fileSystem, resolve(repoRoot, 'scripts', 'run_github_issue_publish_e2e.mjs'));
   const hasReaderappSample = hasFile(fileSystem, resolve(repoRoot, 'scripts', 'run_readerapp_feedback_sample.mjs'));
   const envFilePath = readString(env, 'SIGNALFORGE_ENV_FILE', resolve(repoRoot, '.env'));
+  const connection = publisherMode === 'app'
+    ? await discoverGitHubAppConnection(env)
+    : { mode: 'not_app', repo: e2eRepo, discovered: false, installation: null, errors: [] };
 
   checks.push({
     id: 'env-file',
@@ -177,12 +243,16 @@ export async function evaluateSetupStatus({
 
     checks.push({
       id: 'github-app-installation-id',
-      ok: checkField(env, 'GITHUB_APP_INSTALLATION_ID'),
+      ok: checkField(env, 'GITHUB_APP_INSTALLATION_ID') || Boolean(connection.installation?.installationId),
       level: 'required',
-      summary: checkField(env, 'GITHUB_APP_INSTALLATION_ID')
-        ? 'GitHub App installation id present'
-        : 'GitHub App installation id missing',
-      fix: 'Set GITHUB_APP_INSTALLATION_ID after installing the app into the target repository.',
+      summary: connection.installation?.installationId
+        ? `GitHub App installation discovered: ${connection.installation.installationId}`
+        : checkField(env, 'GITHUB_APP_INSTALLATION_ID')
+          ? 'GitHub App installation id present'
+          : 'GitHub App installation id missing',
+      fix: repoRoot
+        ? 'Install the GitHub App into the target repository or set GITHUB_APP_INSTALLATION_ID directly.'
+        : 'Set GITHUB_APP_INSTALLATION_ID after installing the app into the target repository.',
     });
 
     checks.push({
@@ -197,10 +267,12 @@ export async function evaluateSetupStatus({
 
     checks.push({
       id: 'github-app-e2e-repo',
-      ok: Boolean(e2eRepo),
+      ok: Boolean(connection.installation?.repo || e2eRepo),
       level: 'recommended',
-      summary: e2eRepo
-        ? `GitHub App E2E repository configured: ${e2eRepo}`
+      summary: connection.installation?.repo
+        ? `GitHub App connected repository discovered: ${connection.installation.repo}`
+        : e2eRepo
+          ? `GitHub App E2E repository configured: ${e2eRepo}`
         : 'GitHub App E2E repository is not configured; default lab repo will be used',
       fix: 'Set SIGNALFORGE_E2E_REPO to the repository where the bot should publish validation issues.',
     });
@@ -213,6 +285,34 @@ export async function evaluateSetupStatus({
         ? 'GitHub webhook secret is configured for comment decision sync'
         : 'GitHub webhook secret is not configured; comment decision sync is not production-ready',
       fix: 'Set GITHUB_WEBHOOK_SECRET and use the same secret in the GitHub App webhook settings.',
+    });
+
+    checks.push({
+      id: 'github-app-installation-permissions',
+      ok: Boolean(connection.installation?.hasRequiredPermissions),
+      level: 'recommended',
+      summary: connection.installation
+        ? connection.installation.hasRequiredPermissions
+          ? 'GitHub App installation exposes the required repository permissions'
+          : 'GitHub App installation is missing the required repository permissions'
+        : connection.errors.length
+          ? `GitHub App installation permissions could not be verified: ${connection.errors[0]}`
+          : 'GitHub App installation permissions could not be verified yet',
+      fix: 'Grant Issues: read/write and Metadata: read-only in the GitHub App repository permissions.',
+    });
+
+    checks.push({
+      id: 'github-app-installation-events',
+      ok: Boolean(connection.installation?.hasRequiredEvents),
+      level: 'recommended',
+      summary: connection.installation
+        ? connection.installation.hasRequiredEvents
+          ? 'GitHub App installation exposes the required webhook events'
+          : 'GitHub App installation is missing required webhook events'
+        : connection.errors.length
+          ? `GitHub App webhook events could not be verified: ${connection.errors[0]}`
+          : 'GitHub App webhook events could not be verified yet',
+      fix: 'Enable both Issues and Issue comment events in the GitHub App settings.',
     });
   }
 
@@ -232,6 +332,7 @@ export async function evaluateSetupStatus({
     checks,
     e2eRepo: e2eRepo || 'uDeserve/signalforge-e2e-lab',
     webhookSecretConfigured,
+    connection,
   });
 
   return {
@@ -240,8 +341,9 @@ export async function evaluateSetupStatus({
     canCreatePublisher,
     existingWebAppTrialReady: Boolean(existingWebAppTrialReady),
     githubAppTrialReady: Boolean(githubAppTrialReady),
-    e2eRepo: e2eRepo || 'uDeserve/signalforge-e2e-lab',
+    e2eRepo: connection.installation?.repo || e2eRepo || 'uDeserve/signalforge-e2e-lab',
     webhookSecretConfigured,
+    githubAppConnection: connection,
     setupStages,
     checks,
   };
