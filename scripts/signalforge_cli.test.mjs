@@ -277,8 +277,8 @@ test('signalforge cli manifest emits an agent-readable setup contract', async ()
   const result = await runCli(['manifest'], { cwd: repoRoot });
   assert.equal(result.status, 0);
   const parsed = JSON.parse(result.stdout);
-  assert.equal(parsed.product, 'SignalForge');
-  assert.equal(parsed.frontendIntegration.recommendedExport, 'installSignalForgePreset');
+  assert.equal(parsed.product, 'FeedbackMesh');
+  assert.equal(parsed.frontendIntegration.recommendedExport, 'installFeedbackMeshPreset');
   assert.equal(Array.isArray(parsed.installModes), true);
 });
 
@@ -286,9 +286,9 @@ test('signalforge cli integration emits an agent-readable integration contract',
   const result = await runCli(['integration'], { cwd: repoRoot });
   assert.equal(result.status, 0);
   const parsed = JSON.parse(result.stdout);
-  assert.equal(parsed.product, 'SignalForge');
+  assert.equal(parsed.product, 'FeedbackMesh');
   assert.equal(parsed.integrationTarget, 'existing_web_app');
-  assert.equal(parsed.integrationModes[0].export, 'installSignalForgePreset');
+  assert.equal(parsed.integrationModes[0].export, 'installFeedbackMeshPreset');
 });
 
 test('signalforge cli scaffold emits a machine-readable template payload', async () => {

@@ -1,11 +1,11 @@
 {
-  "name": "@signalforge/github-bridge",
+  "name": "@feedbackmesh/github-bridge",
   "private": true,
   "version": "0.1.0",
-  "description": "GitHub publication bridge for SignalForge decision-ready cases.",
+  "description": "GitHub publication bridge for FeedbackMesh decision-ready cases.",
   "type": "module",
   "keywords": [
-    "signalforge",
+    "feedbackmesh",
     "github",
     "github-issues",
     "github-app",

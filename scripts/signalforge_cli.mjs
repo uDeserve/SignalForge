@@ -1,9 +1,24 @@
 import fs from 'node:fs';
-import { resolve } from 'node:path';
+import { basename, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
 import { evaluateSetupStatus } from '../packages/shared-config/src/index.js';
 
 const repoRoot = resolve(process.cwd());
+const cliInvocation = basename(process.argv[1] || 'signalforge_cli.mjs');
+const feedbackMeshBrand = process.env.FEEDBACKMESH_BRAND === '1' || cliInvocation === 'feedbackmesh_cli.mjs';
+const cliScriptPath = `scripts/${feedbackMeshBrand ? 'feedbackmesh_cli.mjs' : 'signalforge_cli.mjs'}`;
+const setupContractPath = feedbackMeshBrand ? 'feedbackmesh.agent.json' : 'signalforge.agent.json';
+const integrationContractPath = feedbackMeshBrand ? 'feedbackmesh.integration.json' : 'signalforge.integration.json';
+const initCommand = `node ${cliScriptPath} init`;
+const doctorCommand = `node ${cliScriptPath} doctor`;
+const verifyCommand = `node ${cliScriptPath} verify`;
+const integrationCommand = `node ${cliScriptPath} integration`;
+const manifestCommand = `node ${cliScriptPath} manifest`;
+const scaffoldCommand = `node ${cliScriptPath} scaffold <template>`;
+const startCommand = `node ${cliScriptPath} start`;
+const doctorJsonCommand = `node ${cliScriptPath} doctor --json`;
+const verifyJsonCommand = `node ${cliScriptPath} verify --json`;
+const scaffoldBrowserJsonCommand = `node ${cliScriptPath} scaffold browser-preset --json`;
 const envExamplePath = resolve(
   process.env.SIGNALFORGE_ENV_EXAMPLE_FILE || resolve(repoRoot, '.env.example'),
 );
@@ -32,16 +47,16 @@ function mergeEnv(...sources) {
 }
 
 function printUsage() {
-  console.log(`SignalForge CLI
+  console.log(`FeedbackMesh CLI
 
 Usage:
-  node scripts/signalforge_cli.mjs init
-  node scripts/signalforge_cli.mjs doctor
-  node scripts/signalforge_cli.mjs verify
-  node scripts/signalforge_cli.mjs integration
-  node scripts/signalforge_cli.mjs manifest
-  node scripts/signalforge_cli.mjs scaffold <template>
-  node scripts/signalforge_cli.mjs start
+  ${initCommand}
+  ${doctorCommand}
+  ${verifyCommand}
+  ${integrationCommand}
+  ${manifestCommand}
+  ${scaffoldCommand}
+  ${startCommand}
 
 Commands:
   init    Create a local .env from .env.example when missing.
@@ -50,7 +65,7 @@ Commands:
   integration Print a machine-readable web-app integration contract.
   manifest Print a machine-readable setup contract for agents and automation.
   scaffold Emit or write an integration scaffold from the built-in agent templates.
-  start   Start the SignalForge API through the repo startup script.
+  start   Start the FeedbackMesh API through the repo startup script.
 `);
 }
 
@@ -109,7 +124,7 @@ function parseArgs(argv = process.argv.slice(2)) {
 }
 
 function printDoctor(result) {
-  console.log('SignalForge Doctor');
+  console.log('FeedbackMesh Doctor');
   console.log('');
   console.log(`Publisher mode: ${result.publisherMode}`);
   console.log(`Existing web app trial ready: ${result.existingWebAppTrialReady ? 'yes' : 'no'}`);
@@ -148,11 +163,11 @@ function printDoctor(result) {
   console.log('');
   console.log('Recommended next step:');
   if (!result.existingWebAppTrialReady) {
-    console.log('- Run `node scripts/signalforge_cli.mjs init` and fill the required .env values.');
+    console.log(`- Run \`${initCommand}\` and fill the required .env values.`);
     return;
   }
   if (result.publisherMode === 'preview') {
-    console.log('- Run `node scripts/signalforge_cli.mjs start` for local validation, then `node scripts/run_readerapp_feedback_sample.mjs`.');
+    console.log(`- Run \`${startCommand}\` for local validation, then \`node scripts/run_readerapp_feedback_sample.mjs\`.`);
     return;
   }
   if (result.publisherMode === 'app' && !result.githubAppTrialReady) {
@@ -179,7 +194,7 @@ function printDoctor(result) {
 function buildManifest() {
   return {
     schemaVersion: 1,
-    product: 'SignalForge',
+    product: 'FeedbackMesh',
     repoType: 'monorepo',
     audience: ['small_web_team', 'indie_developer', 'coding_agent'],
     goals: [
@@ -193,9 +208,9 @@ function buildManifest() {
         id: 'repo_local_preview',
         purpose: 'fastest local validation path',
         commands: [
-          'npm run sf:init',
-          'npm run sf:doctor',
-          'npm run sf:start',
+          feedbackMeshBrand ? 'npm run fm:init' : 'npm run sf:init',
+          feedbackMeshBrand ? 'npm run fm:doctor' : 'npm run sf:doctor',
+          feedbackMeshBrand ? 'npm run fm:start' : 'npm run sf:start',
           'node scripts/run_readerapp_feedback_sample.mjs',
         ],
         requiredEnv: ['GITHUB_PUBLISHER'],
@@ -207,7 +222,7 @@ function buildManifest() {
         id: 'github_app_trial',
         purpose: 'bot-style GitHub workflow validation',
         commands: [
-          'npm run sf:doctor',
+          feedbackMeshBrand ? 'npm run fm:doctor' : 'npm run sf:doctor',
           'node scripts/run_github_app_publish_e2e.mjs',
         ],
         requiredEnv: [
@@ -229,12 +244,12 @@ function buildManifest() {
       },
     ],
     frontendIntegration: {
-      recommendedExport: 'installSignalForgePreset',
-      package: '@signalforge/adapter',
+      recommendedExport: 'installFeedbackMeshPreset',
+      package: '@feedbackmesh/adapter',
       minimalExample: {
-        import: "import { installSignalForgePreset } from '@signalforge/adapter';",
+        import: "import { installFeedbackMeshPreset } from '@feedbackmesh/adapter';",
         code: [
-          "installSignalForgePreset({",
+          "installFeedbackMeshPreset({",
           "  endpoint: 'https://signalforge.example.com',",
           "  projectKey: 'proj_readerapp',",
           "  appName: 'readerapp',",
@@ -256,24 +271,32 @@ function buildManifest() {
       architecture: 'docs/architecture.md',
       apiContract: 'docs/api-contract.md',
     },
+    agentAssets: {
+      setupContract: setupContractPath,
+      integrationContract: integrationContractPath,
+      doctorJsonCommand,
+      manifestCommand,
+      integrationCommand,
+      scaffoldCommand: scaffoldBrowserJsonCommand,
+    },
   };
 }
 
 function buildIntegrationSpec() {
-  return readJsonFile(resolve(repoRoot, 'signalforge.integration.json'));
+  return readJsonFile(resolve(repoRoot, integrationContractPath));
 }
 
 function buildScaffoldTemplates() {
   return {
     'browser-preset': {
       id: 'browser-preset',
-      description: 'Minimal browser shell with SignalForge preset wiring.',
+      description: 'Minimal browser shell with FeedbackMesh preset wiring.',
       baseDir: resolve(repoRoot, 'examples', 'agent', 'browser-preset'),
       files: ['index.html', 'main.js'],
     },
     'react-preset': {
       id: 'react-preset',
-      description: 'Minimal React shell and client entry with SignalForge preset wiring.',
+      description: 'Minimal React shell and client entry with FeedbackMesh preset wiring.',
       baseDir: resolve(repoRoot, 'examples', 'agent', 'react-preset'),
       files: ['AppShell.jsx', 'client-entry.jsx'],
     },
@@ -290,7 +313,7 @@ function buildScaffoldResult(templateId) {
 
   return {
     schemaVersion: 1,
-    product: 'SignalForge',
+    product: 'FeedbackMesh',
     templateId: template.id,
     description: template.description,
     files: template.files.map((file) => ({
@@ -389,7 +412,7 @@ async function main() {
     }
     console.log(result.message);
     console.log(`Path: ${result.path}`);
-    console.log('Next: fill the GitHub and optional DeepSeek values, then run `node scripts/signalforge_cli.mjs doctor`.');
+    console.log(`Next: fill the GitHub and optional DeepSeek values, then run \`${doctorCommand}\`.`);
     return;
   }
   if (command === 'doctor') {
@@ -418,7 +441,7 @@ async function main() {
       console.log(JSON.stringify(result, null, 2));
       return;
     }
-    console.log('SignalForge Verify');
+    console.log('FeedbackMesh Verify');
     console.log('');
     console.log(`Publisher mode: ${result.setup.publisherMode}`);
     console.log(`Submission accepted: ${result.submission.accepted ? 'yes' : 'no'}`);
@@ -458,13 +481,13 @@ async function main() {
     }
     if (outputDir) {
       const writeResult = writeScaffoldResult(result, outputDir);
-      console.log(`Wrote SignalForge scaffold '${templateId}' to ${writeResult.outputDir}`);
+      console.log(`Wrote FeedbackMesh scaffold '${templateId}' to ${writeResult.outputDir}`);
       for (const file of writeResult.writtenFiles) {
         console.log(`- ${file}`);
       }
       return;
     }
-    console.log(`SignalForge scaffold '${templateId}' is available.`);
+    console.log(`FeedbackMesh scaffold '${templateId}' is available.`);
     console.log('Use `--json` for machine-readable output or `--output <dir>` to write files.');
     return;
   }

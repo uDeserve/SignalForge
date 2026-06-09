@@ -1,8 +1,8 @@
 # Omni Lingua Case Study
 
-Omni Lingua is the first real dogfooding reference case for SignalForge.
+Omni Lingua is the first real dogfooding reference case for FeedbackMesh.
 
-It matters because this is not a toy landing page or a synthetic demo. Omni Lingua is an AI-native reading product with real learner-facing flows, real product friction, and real runtime failure modes. That makes it a credible test bed for the SignalForge thesis.
+It matters because this is not a toy landing page or a synthetic demo. Omni Lingua is an AI-native reading product with real learner-facing flows, real product friction, and real runtime failure modes. That makes it a credible test bed for the FeedbackMesh thesis.
 
 ## Why This Case Matters
 
@@ -19,11 +19,11 @@ The weak point is still upstream:
 - runtime incidents with partial context
 - repeated low-signal feedback that never becomes one clean engineering object
 
-Omni Lingua gives SignalForge a realistic source of those signals.
+Omni Lingua gives FeedbackMesh a realistic source of those signals.
 
 ## What Is Integrated Today
 
-The Omni Lingua frontend already bridges the following into SignalForge:
+The Omni Lingua frontend already bridges the following into FeedbackMesh:
 
 - reader feedback submissions
 - AI story reading feedback submissions
@@ -31,11 +31,11 @@ The Omni Lingua frontend already bridges the following into SignalForge:
 - unhandled promise rejections
 - React error boundary failures
 
-This means SignalForge is not only receiving manually written support-style comments. It is also receiving structured context from an existing web product with real routes, reading surfaces, chapters, and interaction hints.
+This means FeedbackMesh is not only receiving manually written support-style comments. It is also receiving structured context from an existing web product with real routes, reading surfaces, chapters, and interaction hints.
 
 ## Integration Shape
 
-The current Omni Lingua bridge configures SignalForge at frontend bootstrap through environment variables:
+The current Omni Lingua bridge configures FeedbackMesh at frontend bootstrap through environment variables:
 
 - `VITE_SIGNALFORGE_ENDPOINT`
 - `VITE_SIGNALFORGE_PROJECT_KEY`
@@ -62,7 +62,7 @@ Representative reading context includes:
 - current product view
 - feature and action tags
 
-## Why This Is A Strong SignalForge Reference
+## Why This Is A Strong FeedbackMesh Reference
 
 Omni Lingua is a better reference case than a blank example app because it has:
 
@@ -71,7 +71,7 @@ Omni Lingua is a better reference case than a blank example app because it has:
 - both subjective feedback and objective runtime failures
 - a product team that can actually act on the resulting GitHub issues
 
-That makes it a meaningful example of SignalForge operating in the middle of a real AI-native product loop.
+That makes it a meaningful example of FeedbackMesh operating in the middle of a real AI-native product loop.
 
 ## Minimal Validation Loop
 
@@ -79,7 +79,7 @@ The intended dogfooding loop looks like this:
 
 ```text
 Omni Lingua user feedback or runtime issue
--> SignalForge submission or runtime event
+-> FeedbackMesh submission or runtime event
 -> case aggregation and synthesis
 -> GitHub issue publication
 -> maintainer decision in GitHub
@@ -88,12 +88,12 @@ Omni Lingua user feedback or runtime issue
 
 ## What This Proves
 
-This case does not yet prove that SignalForge has solved the entire downstream autonomous repair loop.
+This case does not yet prove that FeedbackMesh has solved the entire downstream autonomous repair loop.
 
 It does prove something important already:
 
-- SignalForge can sit on top of an existing web app
-- the product does not need to be redesigned around SignalForge
+- FeedbackMesh can sit on top of an existing web app
+- the product does not need to be redesigned around FeedbackMesh
 - real user-facing context can be preserved into the case layer
 - the GitHub-native operating model is compatible with a real product team workflow
 
@@ -101,16 +101,16 @@ It does prove something important already:
 
 This dogfooding reference still has room to improve:
 
-- the Omni Lingua bridge is currently a project-local integration layer, not yet a full switch to the published `@signalforge/adapter` path
+- the Omni Lingua bridge is currently a project-local integration layer, not yet a full switch to the published `@feedbackmesh/adapter` path
 - a polished public demo flow for this exact integration has not been packaged yet
 - a public end-to-end narrative with screenshots or video is still pending
 
 ## Why We Are Publishing This Early
 
-The purpose of this case study is not to pretend SignalForge is already fully mature.
+The purpose of this case study is not to pretend FeedbackMesh is already fully mature.
 
 The purpose is to show that the project has crossed an important threshold:
 
-SignalForge is no longer just a theory about feedback-to-issue automation.
+FeedbackMesh is no longer just a theory about feedback-to-issue automation.
 
 It is already being used as the feedback and runtime intelligence layer for a real AI-native web product.

@@ -1,11 +1,11 @@
 {
-  "name": "@signalforge/api",
+  "name": "@feedbackmesh/api",
   "private": true,
   "version": "0.1.0",
-  "description": "SignalForge API for aggregating noisy user feedback into decision-ready GitHub issues.",
+  "description": "FeedbackMesh API for aggregating noisy user feedback into decision-ready GitHub issues.",
   "type": "module",
   "keywords": [
-    "signalforge",
+    "feedbackmesh",
     "feedback-to-issue",
     "case-intelligence",
     "triage",

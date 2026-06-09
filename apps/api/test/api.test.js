@@ -326,11 +326,93 @@ test('agent-first setup session returns install link, env patch, and current sta
 
   assert.equal(contract.statusCode, 200);
   assert.equal(contract.body.mode, 'agent_first_hosted_onboarding');
-  assert.equal(contract.body.instructions.nextAgentAction, 'wait_for_human_github_install_then_confirm_binding');
+  assert.equal(contract.body.instructions.nextAgentAction, 'wait_for_human_github_install_then_poll_setup_session');
   assert.equal(contract.body.machineConfig.projectKey, created.body.project.projectKey);
   assert.equal(contract.body.api.statusUrl, `https://sf.example.com/setup/sessions/${created.body.id}`);
   assert.equal(contract.body.binding.code, created.body.state.binding.code);
   assert.equal(contract.body.instructions.binding.code, created.body.state.binding.code);
+  assert.match(contract.body.instructions.blockingHumanAction.description, /refresh the setup session/i);
+});
+
+test('setup session auto-confirms binding after install is detected for the target repo', async () => {
+  const { privateKey } = await import('node:crypto').then(({ generateKeyPairSync }) =>
+    generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+    }),
+  );
+
+  const api = createSignalForgeApi({
+    store: createStore(':memory:'),
+    logger: { error() {}, warn() {} },
+    env: {
+      SIGNALFORGE_PUBLIC_BASE_URL: 'https://sf.example.com',
+      GITHUB_APP_ID: '123',
+      GITHUB_APP_PRIVATE_KEY: privateKey,
+      GITHUB_API_BASE_URL: 'https://api.github.test',
+      GITHUB_APP_SLUG: 'signalforge',
+    },
+    fetchImpl: async (url) => {
+      if (String(url).endsWith('/repos/uDeserve/reader_lab/installation')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            id: 1001,
+            app_id: 123,
+            app_slug: 'signalforge',
+            account: { login: 'uDeserve', type: 'User' },
+            target_type: 'Repository',
+            repository_selection: 'selected',
+            permissions: {
+              issues: 'write',
+              metadata: 'read',
+            },
+            events: ['issues', 'issue_comment'],
+            html_url: 'https://github.com/apps/signalforge',
+          }),
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ token: 'jwt-or-token-placeholder' }),
+        text: async () => '',
+      };
+    },
+  });
+
+  const created = await api.handleRequest({
+    method: 'POST',
+    url: '/setup/sessions',
+    body: {
+      name: 'Reader Lab',
+      appName: 'reader_lab',
+      repo: { owner: 'uDeserve', name: 'reader_lab' },
+      actor: { type: 'agent', id: 'codex' },
+    },
+  });
+
+  assert.equal(created.statusCode, 201);
+  assert.equal(created.body.state.binding.confirmed, true);
+  assert.equal(created.body.state.binding.repo, 'uDeserve/reader_lab');
+  assert.equal(created.body.state.binding.installationId, '1001');
+  assert.equal(created.body.state.currentStage, 'awaiting_first_submission');
+  assert.equal(created.body.state.stages.install_binding_confirmed, true);
+  assert.equal(created.body.project.github.repo, 'uDeserve/reader_lab');
+  assert.equal(created.body.project.github.installationConnected, true);
+  assert.equal(created.body.project.github.status, 'ready');
+
+  const contract = await api.handleRequest({
+    method: 'GET',
+    url: `/setup/sessions/${created.body.id}/agent-contract`,
+    body: {},
+  });
+
+  assert.equal(contract.statusCode, 200);
+  assert.equal(contract.body.instructions.nextAgentAction, 'patch_target_app_and_send_first_submission');
+  assert.equal(contract.body.instructions.binding.confirmed, true);
 });
 
 test('setup session can refresh binding code and reject stale confirmation', async () => {
@@ -624,6 +706,176 @@ test('api verify run returns setup triage publish and decision-sync verification
   assert.equal(response.body.decisionSync.ready, false);
 });
 
+test('agent contract exposes explicit published state after the first hosted publish', async () => {
+  const { privateKey } = await import('node:crypto').then(({ generateKeyPairSync }) =>
+    generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+    }),
+  );
+
+  let publishCount = 0;
+  const githubPublisher = {
+    async publishCase({ repo, caseRecord, mode }) {
+      publishCount += 1;
+      return {
+        repo,
+        mode,
+        snapshot: {
+          title: caseRecord.canonicalTitle,
+          body: caseRecord.canonicalSummary,
+          labels: ['source:user-feedback'],
+          assignees: [],
+        },
+        result: {
+          externalId: 'gh_issue_hosted_1',
+          url: `https://github.com/${repo}/issues/1`,
+          number: 1,
+        },
+      };
+    },
+  };
+  const api = createSignalForgeApi({
+    store: createStore(':memory:'),
+    logger: { error() {}, warn() {} },
+    githubPublisher,
+    env: {
+      SIGNALFORGE_PUBLIC_BASE_URL: 'https://sf.example.com',
+      GITHUB_APP_SLUG: 'signalforge',
+      GITHUB_APP_ID: '123',
+      GITHUB_APP_PRIVATE_KEY: privateKey,
+      GITHUB_APP_INSTALLATION_ID: '999',
+      GITHUB_WEBHOOK_SECRET: 'secret',
+      GITHUB_PUBLISHER: 'app',
+      SIGNALFORGE_E2E_REPO: 'uDeserve/signalforge-e2e-lab',
+    },
+    repoRoot: '/tmp/signalforge-agent-contract-publish-test',
+    fetchImpl: async (url) => {
+      if (String(url).endsWith('/repos/uDeserve/signalforge-e2e-lab/installation')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            id: 999,
+            app_id: 123,
+            app_slug: 'signalforge',
+            account: { login: 'uDeserve', type: 'User' },
+            target_type: 'Repository',
+            repository_selection: 'selected',
+            permissions: {
+              issues: 'write',
+              metadata: 'read',
+            },
+            events: ['issues', 'issue_comment'],
+            html_url: 'https://github.com/apps/signalforge',
+          }),
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ token: 'jwt-or-token-placeholder' }),
+        text: async () => '',
+      };
+    },
+    fileSystem: {
+      existsSync(target) {
+        const normalized = String(target).replace(/\\/g, '/');
+        return normalized.endsWith('/.env') ||
+          normalized.endsWith('/scripts/run_github_app_publish_e2e.mjs') ||
+          normalized.endsWith('/scripts/run_readerapp_feedback_sample.mjs');
+      },
+      readFileSync() {
+        return '';
+      },
+    },
+  });
+
+  const created = await api.handleRequest({
+    method: 'POST',
+    url: '/setup/sessions',
+    body: {
+      name: 'Hosted Publish Probe',
+      appName: 'hosted_publish_probe',
+      repo: { owner: 'uDeserve', name: 'signalforge-e2e-lab' },
+      actor: { type: 'agent', id: 'codex' },
+    },
+  });
+  const sessionId = created.body.id;
+  const bindingCode = created.body.state.binding.code;
+  const projectKey = created.body.project.projectKey;
+
+  const bound = await api.handleRequest({
+    method: 'POST',
+    url: `/setup/sessions/${sessionId}/github-binding`,
+    body: {
+      bindingCode,
+      repo: 'uDeserve/signalforge-e2e-lab',
+      installationId: '999',
+      actor: { type: 'agent', id: 'codex' },
+    },
+  });
+  assert.equal(bound.statusCode, 200);
+  assert.equal(bound.body.state.currentStage, 'awaiting_first_submission');
+
+  const submission = await api.handleRequest({
+    method: 'POST',
+    url: '/submissions',
+    headers: { 'x-signalforge-project-key': projectKey },
+    body: {
+      source: 'adapter',
+      reporter: { id: 'hosted_user_1' },
+      appContext: {
+        appName: 'hosted_publish_probe',
+        environment: 'production',
+        release: '1.0.0',
+        route: '/reader/probe',
+        feature: 'reader_feedback',
+      },
+      content: {
+        title: 'Hosted publish probe',
+        body: 'Reader popup blocks reading on mobile and should publish once.',
+        categoryHint: 'feedback',
+      },
+      evidence: {},
+      privacy: { containsPii: false, redactionStatus: 'pending' },
+      raw: { source: 'hosted_publish_probe' },
+    },
+  });
+
+  await api.handleRequest({
+    method: 'POST',
+    url: '/triage/run',
+    headers: { 'x-signalforge-project-key': projectKey },
+    body: { submissionIds: [submission.body.submissionId] },
+  });
+  assert.equal(publishCount, 1);
+
+  const session = await api.handleRequest({
+    method: 'GET',
+    url: `/setup/sessions/${sessionId}`,
+    body: {},
+  });
+  assert.equal(session.statusCode, 200);
+  assert.equal(session.body.state.currentStage, 'live');
+  assert.equal(session.body.state.verify.publish.status, 'published');
+  assert.equal(session.body.state.verify.publish.alreadyPublished, true);
+  assert.equal(session.body.state.verify.publish.issueUrl, 'https://github.com/uDeserve/signalforge-e2e-lab/issues/1');
+  assert.equal(session.body.state.verify.nextAgentAction, 'monitor_live_project');
+
+  const contract = await api.handleRequest({
+    method: 'GET',
+    url: `/setup/sessions/${sessionId}/agent-contract`,
+    body: {},
+  });
+  assert.equal(contract.statusCode, 200);
+  assert.equal(contract.body.instructions.publish.status, 'published');
+  assert.equal(contract.body.instructions.publish.alreadyPublished, true);
+  assert.equal(contract.body.instructions.publish.issueUrl, 'https://github.com/uDeserve/signalforge-e2e-lab/issues/1');
+  assert.equal(publishCount, 1);
+});
+
 test('similar feedback from different hosted projects stays in separate cases', async () => {
   const api = createSignalForgeApi({ store: createStore(':memory:'), logger: { error() {}, warn() {} } });
 
@@ -872,12 +1124,63 @@ test('api publish uses injected github publisher result', async () => {
   const publishResponse = await api.handleRequest({
     method: 'POST',
     url: `/cases/${caseRecord.id}/publish`,
-    body: { target: { repo: 'uDeserve/SignalForge', mode: 'github_issue' } },
+    body: { target: { repo: 'uDeserve/FeedbackMesh', mode: 'github_issue' } },
   });
 
   assert.equal(publishResponse.statusCode, 201);
   assert.equal(publishResponse.body.result.externalId, 'gh_issue_123');
   assert.equal(publishResponse.body.result.number, 99);
+});
+
+test('api publish is idempotent for an already-published case', async () => {
+  let publishCount = 0;
+  const githubPublisher = {
+    async publishCase({ caseRecord, repo, mode }) {
+      publishCount += 1;
+      return {
+        repo,
+        mode,
+        snapshot: {
+          title: caseRecord.canonicalTitle,
+          body: caseRecord.canonicalSummary,
+          labels: ['source:user-feedback'],
+          assignees: [],
+        },
+        result: {
+          externalId: 'gh_issue_1',
+          url: `https://github.com/${repo}/issues/1`,
+          number: 1,
+        },
+      };
+    },
+  };
+  const api = createSignalForgeApi({
+    store: createStore(':memory:'),
+    logger: { error() {}, warn() {} },
+    githubPublisher,
+  });
+
+  const caseRecord = await createSubmittedCase(api, {
+    source: 'web_widget',
+    reporter: { id: 'bug_user' },
+    appContext: { route: '/reader/save', feature: 'save_flow', release: '1.0.0' },
+    content: { title: 'Save freezes', body: 'Save freezes and returns 500.' },
+    evidence: { runtimeErrors: [{ message: 'timeout', fingerprint: 'save-timeout' }] },
+  });
+
+  assert.equal(caseRecord.publication.published, true);
+  assert.equal(publishCount, 1);
+
+  const publishResponse = await api.handleRequest({
+    method: 'POST',
+    url: `/cases/${caseRecord.id}/publish`,
+    body: { target: { repo: 'uDeserve/FeedbackMesh', mode: 'github_issue' } },
+  });
+
+  assert.equal(publishResponse.statusCode, 200);
+  assert.equal(publishResponse.body.alreadyPublished, true);
+  assert.equal(publishResponse.body.result.externalId, 'gh_issue_1');
+  assert.equal(publishCount, 1);
 });
 
 test('github preview publisher returns issue-like publication result', async () => {
@@ -894,12 +1197,12 @@ test('github preview publisher returns issue-like publication result', async () 
       status: 'ready_for_publish',
       metadata: {},
     },
-    repo: 'uDeserve/SignalForge',
+    repo: 'uDeserve/FeedbackMesh',
     mode: 'github_issue',
   });
-  assert.equal(published.repo, 'uDeserve/SignalForge');
+  assert.equal(published.repo, 'uDeserve/FeedbackMesh');
   assert.equal(published.result.number, 1);
-  assert.match(published.result.url, /github\.com\/uDeserve\/SignalForge\/issues\/1/);
+  assert.match(published.result.url, /github\.com\/uDeserve\/FeedbackMesh\/issues\/1/);
 });
 
 test('github pat publisher creates issue through github api contract', async () => {
@@ -915,7 +1218,7 @@ test('github pat publisher creates issue through github api contract', async () 
           return {
             id: 12345,
             number: 7,
-            html_url: 'https://github.com/uDeserve/SignalForge/issues/7',
+            html_url: 'https://github.com/uDeserve/FeedbackMesh/issues/7',
           };
         },
       };
@@ -934,11 +1237,11 @@ test('github pat publisher creates issue through github api contract', async () 
       status: 'ready_for_publish',
       metadata: {},
     },
-    repo: 'uDeserve/SignalForge',
+    repo: 'uDeserve/FeedbackMesh',
     mode: 'github_issue',
   });
 
-  assert.equal(request.url, 'https://api.github.test/repos/uDeserve/SignalForge/issues');
+  assert.equal(request.url, 'https://api.github.test/repos/uDeserve/FeedbackMesh/issues');
   assert.equal(request.init.method, 'POST');
   assert.match(request.init.headers.Authorization, /Bearer test_token/);
   const payload = JSON.parse(request.init.body);
@@ -964,7 +1267,7 @@ test('github app publisher uses installation token provider contract', async () 
           return {
             id: 777,
             number: 11,
-            html_url: 'https://github.com/uDeserve/SignalForge/issues/11',
+            html_url: 'https://github.com/uDeserve/FeedbackMesh/issues/11',
           };
         },
       };
@@ -983,11 +1286,11 @@ test('github app publisher uses installation token provider contract', async () 
       status: 'ready_for_publish',
       metadata: {},
     },
-    repo: 'uDeserve/SignalForge',
+    repo: 'uDeserve/FeedbackMesh',
     mode: 'github_issue',
   });
 
-  assert.equal(request.url, 'https://api.github.test/repos/uDeserve/SignalForge/issues');
+  assert.equal(request.url, 'https://api.github.test/repos/uDeserve/FeedbackMesh/issues');
   assert.match(request.init.headers.Authorization, /Bearer installation_token_1/);
   assert.equal(published.transport.authMode, 'app');
   assert.equal(published.result.number, 11);
@@ -1183,7 +1486,7 @@ test('api rejects publication for non-actionable cases', async () => {
   const publishResponse = await api.handleRequest({
     method: 'POST',
     url: `/cases/${caseRecord.id}/publish`,
-    body: { target: { repo: 'uDeserve/SignalForge', mode: 'github_issue' } },
+    body: { target: { repo: 'uDeserve/FeedbackMesh', mode: 'github_issue' } },
   });
   assert.equal(publishResponse.statusCode, 422);
 });

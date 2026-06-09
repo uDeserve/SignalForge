@@ -1,6 +1,6 @@
 # GitHub Repo Setup
 
-This file defines the recommended GitHub repository presentation for SignalForge.
+This file defines the recommended GitHub repository presentation for FeedbackMesh.
 
 The goal is simple:
 
@@ -35,7 +35,7 @@ Only use that as the repository website if you want the repo to emphasize live p
 
 Recommended social preview image:
 
-- use `docs/assets/signalforge-hero-image2.png`
+- use `docs/assets/feedbackmesh-hero-image2.png`
 
 Recommended preview copy direction:
 
@@ -66,7 +66,7 @@ Recommended topics:
 
 Recommended:
 
-`SignalForge is a GitHub-native case intelligence layer for AI-native product teams. It turns noisy feedback and runtime signals into aggregated cases, then publishes decision-ready issues when policy allows.`
+`FeedbackMesh is a GitHub-native case intelligence layer for AI-native product teams. It turns noisy feedback and runtime signals into aggregated cases, then publishes decision-ready issues when policy allows.`
 
 Shorter version:
 

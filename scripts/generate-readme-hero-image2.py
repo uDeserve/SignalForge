@@ -7,13 +7,14 @@ from openai import OpenAI
 
 
 DEFAULT_PROMPT = (
-    "Create a premium README hero banner for an open source developer tool named SignalForge. "
-    "Audience: engineers and product teams on GitHub. "
-    "Tone: premium, serious, modern, minimal, high-end SaaS open-source aesthetic. "
+    "Create a premium README hero banner for an open source developer tool named FeedbackMesh. "
+    "Audience: engineers, coding agents, and product teams on GitHub. "
+    "Tone: premium, serious, modern, minimal, high-end open-source infrastructure aesthetic. "
     "Visual style: dark cinematic product graphic, crisp interface-style composition, elegant blue-cyan and soft mint accents, "
     "subtle depth, clean layout, readable English labels only, no watermark, no logo from other brands, no purple bias. "
-    "Required visual modules: multiple noisy feedback inputs on the left, one central aggregated case card, one GitHub issue destination on the right, "
-    "thin connector lines showing consolidation. "
+    "Required visual modules: multiple noisy feedback inputs on the left, one central aggregated case card in the middle, "
+    "one GitHub issue destination on the right, plus a distinct agent-first onboarding or machine-readable contract panel that makes the product feel installable by an agent. "
+    "Include wording that reinforces agent-first onboarding, GitHub-native workflow, and clean issue publication. "
     "The graphic should feel like a refined launch graphic from a top-tier open source infrastructure project."
 )
 

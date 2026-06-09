@@ -222,7 +222,7 @@ export async function evaluateSetupStatus({
       summary: e2eRepo
         ? `E2E repository configured: ${e2eRepo}`
         : 'E2E repository not configured; default lab repo will be used',
-      fix: 'Set SIGNALFORGE_E2E_REPO to the repository where SignalForge should create validation issues.',
+    fix: 'Set SIGNALFORGE_E2E_REPO to the repository where FeedbackMesh should create validation issues.',
     });
   }
 

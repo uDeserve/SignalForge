@@ -4,7 +4,7 @@ This case is derived from the documented Omni Lingua production incident:
 
 - `docs/INCIDENT_2026-05-20_READER_PROD_BACKEND_HANG.md`
 
-It shows why SignalForge matters even when the root problem is operational rather than purely interface-level.
+It shows why FeedbackMesh matters even when the root problem is operational rather than purely interface-level.
 
 ## What Happened
 
@@ -18,7 +18,7 @@ The documented incident describes a state where:
 
 This is a classic example of a failure that users experience before the engineering team necessarily has a clean diagnosis.
 
-## Why This Is A SignalForge Problem
+## Why This Is A FeedbackMesh Problem
 
 Users do not report:
 
@@ -33,7 +33,7 @@ They report things like:
 - requests keep timing out
 - the app feels broken today
 
-That is exactly the upstream gap SignalForge is meant to handle.
+That is exactly the upstream gap FeedbackMesh is meant to handle.
 
 ## What A Good Aggregated Case Looks Like
 
@@ -58,7 +58,7 @@ Without aggregation, operational incidents often first appear as:
 - scattered support complaints
 - frontend-looking issues that are really backend failures
 
-SignalForge helps compress that messy early warning layer into something that can enter a GitHub-native engineering workflow sooner.
+FeedbackMesh helps compress that messy early warning layer into something that can enter a GitHub-native engineering workflow sooner.
 
 ## Why This Matters For AI-Native Workflows
 
@@ -75,4 +75,4 @@ This case illustrates that the highest-leverage automation may start before diag
 
 This case is based directly on the repository incident record.
 
-The case summary intentionally translates operational symptoms into the user-facing problem shape that SignalForge is designed to capture.
+The case summary intentionally translates operational symptoms into the user-facing problem shape that FeedbackMesh is designed to capture.

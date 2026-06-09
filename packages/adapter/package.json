@@ -1,7 +1,7 @@
 {
-  "name": "@signalforge/adapter",
+  "name": "@feedbackmesh/adapter",
   "version": "0.1.0",
-  "description": "Drop-in browser adapter for AI-native feedback capture, runtime signals, and SignalForge issue automation.",
+  "description": "Drop-in browser adapter for AI-native feedback capture, runtime signals, and FeedbackMesh issue automation.",
   "license": "MIT",
   "type": "module",
   "exports": "./src/index.js",
@@ -10,7 +10,7 @@
     "README.md"
   ],
   "keywords": [
-    "signalforge",
+    "feedbackmesh",
     "ai-native",
     "feedback",
     "product-feedback",
@@ -26,10 +26,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/uDeserve/SignalForge.git",
+    "url": "https://github.com/uDeserve/FeedbackMesh.git",
     "directory": "packages/adapter"
   },
-  "homepage": "https://github.com/uDeserve/SignalForge/tree/main/packages/adapter",
+  "homepage": "https://github.com/uDeserve/FeedbackMesh/tree/main/packages/adapter",
   "publishConfig": {
     "access": "public"
   },

@@ -1,11 +1,11 @@
 {
-  "name": "@signalforge/github-app",
+  "name": "@feedbackmesh/github-app",
   "private": true,
   "version": "0.1.0",
-  "description": "SignalForge GitHub App bridge for issue publication and maintainer decision sync.",
+  "description": "FeedbackMesh GitHub App bridge for issue publication and maintainer decision sync.",
   "type": "module",
   "keywords": [
-    "signalforge",
+    "feedbackmesh",
     "github-app",
     "github-issues",
     "issue-automation",

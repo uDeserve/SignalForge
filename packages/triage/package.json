@@ -1,11 +1,11 @@
 {
-  "name": "@signalforge/triage",
+  "name": "@feedbackmesh/triage",
   "private": true,
   "version": "0.1.0",
-  "description": "Aggregation-aware feedback triage and case synthesis for SignalForge.",
+  "description": "Aggregation-aware feedback triage and case synthesis for FeedbackMesh.",
   "type": "module",
   "keywords": [
-    "signalforge",
+    "feedbackmesh",
     "triage",
     "feedback-to-issue",
     "case-intelligence",

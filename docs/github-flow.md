@@ -4,7 +4,7 @@ GitHub is the collaboration and publication surface for SignalForge.
 
 ## Auth Strategy
 
-SignalForge should support two GitHub publication phases:
+FeedbackMesh should support two GitHub publication phases:
 
 1. `PAT` or token-backed publication for local validation and first-project rollout
 2. `GitHub App` publication for reusable, multi-repo, installable production usage
@@ -21,7 +21,7 @@ That means:
 
 ## Publisher Contract
 
-SignalForge should treat GitHub publication as a transport boundary.
+FeedbackMesh should treat GitHub publication as a transport boundary.
 
 The publisher interface should accept:
 
@@ -47,7 +47,7 @@ Later this should allow:
 
 ## GitHub App Skeleton
 
-SignalForge now has an `app` publisher boundary.
+FeedbackMesh now has an `app` publisher boundary.
 
 At the current stage it should be understood as:
 
@@ -71,13 +71,13 @@ GitHub is downstream, not the system of record.
 
 ## Decision Model
 
-SignalForge should prefer a single maintainer decision point.
+FeedbackMesh should prefer a single maintainer decision point.
 
 The intended flow is:
 
-1. feedback or runtime signals enter SignalForge
+1. feedback or runtime signals enter FeedbackMesh
 2. triage normalizes, clusters, and summarizes them
-3. SignalForge publishes a GitHub issue automatically when the case is publishable
+3. FeedbackMesh publishes a GitHub issue automatically when the case is publishable
 4. the owner decides whether the issue should enter the execution loop
 
 The owner should not need to pre-approve issue creation in the normal path.
@@ -132,7 +132,7 @@ Optional execution metadata may follow, for example:
 
 ## Publication Standard
 
-SignalForge should publish a normalized issue, not raw user feedback.
+FeedbackMesh should publish a normalized issue, not raw user feedback.
 
 Each issue should include:
 

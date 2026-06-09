@@ -13,9 +13,9 @@
     "github_app_bot_workflow"
   ],
   "repoLocalCommands": {
-    "init": "npm run sf:init",
-    "doctor": "npm run sf:doctor",
-    "start": "npm run sf:start",
+    "init": "npm run fm:init",
+    "doctor": "npm run fm:doctor",
+    "start": "npm run fm:start",
     "previewVerification": "node scripts/run_readerapp_feedback_sample.mjs",
     "githubAppVerification": "node scripts/run_github_app_publish_e2e.mjs"
   },
@@ -83,11 +83,13 @@
     "apiContract": "docs/api-contract.md"
   },
   "agentAssets": {
-    "setupContract": "signalforge.agent.json",
-    "integrationContract": "signalforge.integration.json",
-    "doctorJsonCommand": "node scripts/signalforge_cli.mjs doctor --json",
-    "manifestCommand": "node scripts/signalforge_cli.mjs manifest",
-    "integrationCommand": "node scripts/signalforge_cli.mjs integration",
-    "scaffoldCommand": "node scripts/signalforge_cli.mjs scaffold browser-preset --json"
+    "preferredSetupContract": "feedbackmesh.agent.json",
+    "preferredIntegrationContract": "feedbackmesh.integration.json",
+    "legacySetupContract": "signalforge.agent.json",
+    "legacyIntegrationContract": "signalforge.integration.json",
+    "doctorJsonCommand": "node scripts/feedbackmesh_cli.mjs doctor --json",
+    "manifestCommand": "node scripts/feedbackmesh_cli.mjs manifest",
+    "integrationCommand": "node scripts/feedbackmesh_cli.mjs integration",
+    "scaffoldCommand": "node scripts/feedbackmesh_cli.mjs scaffold browser-preset --json"
   }
 }

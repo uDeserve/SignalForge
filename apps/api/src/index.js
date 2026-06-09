@@ -244,6 +244,12 @@ function buildSetupSessionState({
   const firstSubmissionSeen = submissions.length > 0;
   const firstCaseCreated = cases.length > 0;
   const firstIssuePublished = publishedCases.length > 0;
+  const latestPublishedCase = publishedCases[0] ?? null;
+  const latestPublication = latestPublishedCase?.publication?.primaryPublicationId
+    ? store.getPublication(latestPublishedCase.publication.primaryPublicationId)
+    : latestPublishedCase
+      ? store.listPublications(latestPublishedCase.id)[0] ?? null
+      : null;
 
   let currentStage = 'project_created';
   if (!githubInstalled && !bindingConfirmed) currentStage = 'awaiting_github_app_install';
@@ -261,8 +267,8 @@ function buildSetupSessionState({
         required: true,
         title: 'Install the GitHub App',
         description: bindingRepo
-          ? `Install the SignalForge GitHub App into ${bindingRepo}, then confirm the installation with binding code ${bindingCode}.`
-          : `Install the SignalForge GitHub App into the target repository, then confirm the installation with binding code ${bindingCode}.`,
+        ? `Install the FeedbackMesh GitHub App into ${bindingRepo}, then refresh the setup session. If auto-detection does not complete, confirm with binding code ${bindingCode}.`
+        : `Install the FeedbackMesh GitHub App into the target repository, then refresh the setup session. If auto-detection does not complete, confirm with binding code ${bindingCode}.`,
         url: installUrl,
       }
     : !bindingConfirmed
@@ -336,7 +342,7 @@ function buildSetupSessionState({
     verify: {
       nextAgentAction:
         !githubInstalled && !bindingConfirmed
-          ? 'wait_for_human_github_install_then_confirm_binding'
+          ? 'wait_for_human_github_install_then_poll_setup_session'
           : !bindingConfirmed
             ? 'confirm_github_install_binding'
             : !githubInstalled
@@ -348,6 +354,26 @@ function buildSetupSessionState({
               : !firstIssuePublished
                 ? 'verify_publish_flow'
                 : 'monitor_live_project',
+      publish:
+        firstIssuePublished && latestPublication
+          ? {
+              status: 'published',
+              alreadyPublished: true,
+              caseId: latestPublishedCase?.id ?? '',
+              publicationId: latestPublication.id,
+              repo: latestPublication.target?.repo ?? '',
+              issueUrl: latestPublication.result?.url ?? '',
+              issueNumber: latestPublication.result?.number ?? null,
+            }
+          : {
+              status: firstCaseCreated ? 'pending' : 'not_ready',
+              alreadyPublished: false,
+              caseId: firstCaseCreated ? cases[0]?.id ?? '' : '',
+              publicationId: '',
+              repo: bindingRepo,
+              issueUrl: '',
+              issueNumber: null,
+            },
       recommendedSubmission: {
         source: 'adapter',
         content: {
@@ -370,9 +396,66 @@ async function refreshSetupSessionRecord({
   const project = store.getProjectById(session.projectId);
   if (!project) return null;
   const connection = await inspectProjectGitHubConnection(project);
-  const updatedProject = store.saveProject(withProjectGitHubConnection(project, connection));
+  let updatedProject = store.saveProject(withProjectGitHubConnection(project, connection));
+  let updatedSession = session;
+
+  const existingBinding = session.metadata?.githubBinding ?? {};
+  const bindingConfirmed = Boolean(existingBinding.confirmedAt);
+  const autoBindingRepo = normalizeProjectRepo(
+    existingBinding.repo ?? session.target?.repo ?? updatedProject.repo ?? {},
+  );
+
+  if (!bindingConfirmed && connection.connected && autoBindingRepo.fullName) {
+    const now = new Date().toISOString();
+    const installationId = firstNonEmpty(
+      connection.installation?.installationId,
+      existingBinding.installationId,
+    );
+    updatedProject = store.saveProject({
+      ...updatedProject,
+      updatedAt: now,
+      repo: autoBindingRepo,
+      metadata: {
+        ...(updatedProject.metadata ?? {}),
+        github: {
+          ...(updatedProject.metadata?.github ?? {}),
+          repo: autoBindingRepo.fullName,
+          bindingStatus: 'confirmed',
+          bindingConfirmedAt: now,
+          bindingCodeLastConfirmed: firstNonEmpty(existingBinding.bindingCode),
+          boundBySetupSessionId: session.id,
+          autoConfirmed: true,
+          autoConfirmedAt: now,
+          ...(installationId ? { installationId } : {}),
+        },
+      },
+    });
+    updatedSession = store.saveSetupSession({
+      ...session,
+      updatedAt: now,
+      target: {
+        ...(session.target ?? {}),
+        repo: autoBindingRepo,
+      },
+      metadata: {
+        ...(session.metadata ?? {}),
+        githubBinding: {
+          ...existingBinding,
+          bindingCode: firstNonEmpty(existingBinding.bindingCode),
+          repo: autoBindingRepo.fullName,
+          confirmedAt: now,
+          status: 'confirmed',
+          autoConfirmed: true,
+          autoConfirmedAt: now,
+          ...(installationId ? { installationId } : {}),
+          confirmedBy: { type: 'system', id: 'signalforge' },
+        },
+      },
+    });
+  }
+
   const nextState = buildSetupSessionState({
-    session,
+    session: updatedSession,
     project: updatedProject,
     connection,
     store,
@@ -381,12 +464,12 @@ async function refreshSetupSessionRecord({
   });
   const nextStatus = nextState.currentStage === 'live' ? 'ready' : 'active';
   return store.saveSetupSession({
-    ...session,
+    ...updatedSession,
     updatedAt: new Date().toISOString(),
     state: nextState,
     status: nextStatus,
       metadata: {
-        ...(session.metadata ?? {}),
+        ...(updatedSession.metadata ?? {}),
         projectKey: updatedProject.projectKey,
       },
     });
@@ -1165,8 +1248,8 @@ export function createSignalForgeApi({
     const response = buildSetupSessionResponse(session);
     return {
       schemaVersion: 1,
-      product: 'SignalForge',
-      objective: 'Connect a web app to hosted SignalForge with the minimum possible human action.',
+      product: 'FeedbackMesh',
+      objective: 'Connect a web app to hosted FeedbackMesh with the minimum possible human action.',
       mode: 'agent_first_hosted_onboarding',
       setupSession: response,
       instructions: {
@@ -1174,6 +1257,7 @@ export function createSignalForgeApi({
         nextAgentAction: response.state.verify?.nextAgentAction ?? 'poll_setup_session',
         installUrl: response.state.installUrl,
         binding: response.state.binding ?? {},
+        publish: response.state.verify?.publish ?? {},
       },
       machineConfig: {
         endpoint: response.project?.hosted?.endpoint ?? publicBaseUrl,
@@ -1537,6 +1621,22 @@ export function createSignalForgeApi({
         }
         if (!caseRecord.decisionReadiness?.actionable || caseRecord.publication?.target === PublicationTarget.none) {
           return { statusCode: 422, error: { code: 'unprocessable', message: 'case is not ready for publication' } };
+        }
+        if (caseRecord.publication?.published) {
+          const existingPublication = caseRecord.publication?.primaryPublicationId
+            ? store.getPublication(caseRecord.publication.primaryPublicationId)
+            : store.listPublications(caseRecord.id)[0] ?? null;
+          if (existingPublication) {
+            return {
+              statusCode: 200,
+              body: {
+                publicationId: existingPublication.id,
+                caseId: caseRecord.id,
+                result: existingPublication.result,
+                alreadyPublished: true,
+              },
+            };
+          }
         }
         const payload = body?.target ?? {};
         const published = await githubPublisher.publishCase({

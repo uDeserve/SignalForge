@@ -25,4 +25,4 @@ The sample uses:
 - SignalForge triage engine
 - optional DeepSeek analyzer if env is configured
 
-If DeepSeek is unreachable, SignalForge should fall back to heuristic triage automatically.
+If DeepSeek is unreachable, FeedbackMesh should fall back to heuristic triage automatically.

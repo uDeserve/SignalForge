@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to SignalForge will be documented in this file.
+All notable changes to FeedbackMesh will be documented in this file.
 
 The format is intentionally lightweight and focused on meaningful product-facing changes.
 
@@ -11,7 +11,7 @@ The format is intentionally lightweight and focused on meaningful product-facing
 - aggregation-aware case formation for feedback and runtime signals
 - GitHub App publication flow with webhook-driven decision sync
 - repo-local setup CLI with `sf:init`, `sf:doctor`, and `sf:start`
-- coding-agent integration assets including `AGENT_README.md`, `signalforge.agent.json`, and scaffold commands
+- coding-agent integration assets including `AGENT_README.md`, `feedbackmesh.agent.json`, and scaffold commands
 - AI-native product positioning, GitHub repo metadata guidance, and search-oriented package metadata
 
 ### Verified

@@ -15,15 +15,15 @@ AI-native feedback-to-issue harness for turning user feedback into decision-read
 
 ## One-Sentence Pitch
 
-SignalForge merges duplicate feedback, enriches it with context, and publishes the cases that deserve engineering attention in GitHub-native and agent-ready form.
+FeedbackMesh merges duplicate feedback, enriches it with context, and publishes the cases that deserve engineering attention in GitHub-native and agent-ready form.
 
 ## Pinned Repo Copy
 
-SignalForge is a GitHub-native case intelligence layer for AI-native product teams. It turns noisy feedback and runtime signals into aggregated cases, then publishes decision-ready issues when policy allows.
+FeedbackMesh is a GitHub-native case intelligence layer for AI-native product teams. It turns noisy feedback and runtime signals into aggregated cases, then publishes decision-ready issues when policy allows.
 
 ## Social Preview Copy
 
-Modern automation already handles issue to code to PR. What most teams still lack is the upstream harness from noisy user reality to one clear engineering decision. SignalForge creates that path.
+Modern automation already handles issue to code to PR. What most teams still lack is the upstream harness from noisy user reality to one clear engineering decision. FeedbackMesh creates that path.
 
 ## Suggested GitHub About
 

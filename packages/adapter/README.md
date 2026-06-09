@@ -1,4 +1,4 @@
-# @signalforge/adapter
+# @feedbackmesh/adapter
 
 Easy-start integration layer for existing web apps.
 
@@ -8,23 +8,23 @@ This package is meant for developers who already have a web product and want a l
 - runtime errors
 - route / environment / release context
 
-into SignalForge.
+into FeedbackMesh.
 
 ## What It Does
 
 - sends feedback to `/submissions`
 - sends runtime errors to `/runtime-events`
-- converts Sentry-style events into SignalForge runtime events
-- converts GlitchTip-style events into SignalForge runtime events
+- converts Sentry-style events into FeedbackMesh runtime events
+- converts GlitchTip-style events into FeedbackMesh runtime events
 - installs browser-style global error handlers
 - mounts a reusable feedback widget
 
 ## Example
 
 ```js
-import { createSignalForgeAdapter } from '@signalforge/adapter';
+import { createFeedbackMeshAdapter } from '@feedbackmesh/adapter';
 
-const sf = createSignalForgeAdapter({
+const sf = createFeedbackMeshAdapter({
   endpoint: 'https://signalforge.example.com',
   projectKey: 'proj_readerapp',
   appName: 'readerapp',
@@ -54,9 +54,9 @@ sf.mountFeedbackWidget(document.getElementById('sf-feedback-root'), {
 For teams that want the shortest browser-side setup, use the one-call installer:
 
 ```js
-import { installSignalForgeBrowser } from '@signalforge/adapter';
+import { installFeedbackMeshBrowser } from '@feedbackmesh/adapter';
 
-const sf = installSignalForgeBrowser({
+const sf = installFeedbackMeshBrowser({
   endpoint: 'https://signalforge.example.com',
   projectKey: 'proj_readerapp',
   appName: 'readerapp',
@@ -79,9 +79,9 @@ This path is meant for small teams that want:
 If you want the shortest possible preset, use:
 
 ```js
-import { installSignalForgePreset } from '@signalforge/adapter';
+import { installFeedbackMeshPreset } from '@feedbackmesh/adapter';
 
-installSignalForgePreset({
+installFeedbackMeshPreset({
   endpoint: 'https://signalforge.example.com',
   projectKey: 'proj_readerapp',
   appName: 'readerapp',
@@ -90,7 +90,7 @@ installSignalForgePreset({
 });
 ```
 
-With this preset, SignalForge will:
+With this preset, FeedbackMesh will:
 
 - look for `#sf-feedback-root`
 - mount the feedback widget there
@@ -99,20 +99,20 @@ With this preset, SignalForge will:
 
 ## Recommended Runtime Setup
 
-SignalForge should not replace a mature error collection provider.
+FeedbackMesh should not replace a mature error collection provider.
 
 Recommended layering:
 
 - Sentry or GlitchTip collects runtime exceptions
-- `@signalforge/adapter` normalizes the event and captures product context
-- SignalForge turns the event into an engineering case
+- `@feedbackmesh/adapter` normalizes the event and captures product context
+- FeedbackMesh turns the event into an engineering case
 
 ## Main Exports
 
-- `createSignalForgeAdapter`
+- `createFeedbackMeshAdapter`
 - `installSignalForge`
-- `installSignalForgeBrowser`
-- `installSignalForgePreset`
+- `installFeedbackMeshBrowser`
+- `installFeedbackMeshPreset`
 - `captureError`
 - `linkSentry`
 - `linkGlitchTip`

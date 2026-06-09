@@ -1,11 +1,11 @@
-# SignalForge
+# FeedbackMesh
 
 <p align="center">
   <strong>The missing harness between user reality and AI-native software automation.</strong>
 </p>
 
 <p align="center">
-  Modern automation already handles <em>issue -> code -> PR -> review</em>. SignalForge fills the missing upstream step: turning noisy user feedback and runtime pain into decision-ready GitHub issues that agents and engineering systems can actually execute on.
+  Modern automation already handles <em>issue -> code -> PR -> review</em>. FeedbackMesh fills the missing upstream step: turning noisy user feedback and runtime pain into decision-ready GitHub issues that agents and engineering systems can actually execute on.
 </p>
 
 <p align="center">
@@ -19,21 +19,22 @@
 <p align="center">
   <a href="./docs/vision.md">Vision</a> ·
   <a href="./docs/quick-start.md">Quick Start</a> ·
+  <a href="./docs/hosted-agent-first.md">Hosted Agent-First</a> ·
   <a href="./docs/github-app-setup.md">GitHub App Setup</a> ·
   <a href="./docs/architecture.md">Architecture</a> ·
   <a href="./docs/api-contract.md">API Contract</a> ·
   <a href="./docs/live-e2e.md">Live E2E</a>
 </p>
 
-SignalForge is built for small web application teams and independent developers who already have users, already ship on GitHub, and increasingly want AI systems to participate in the whole software loop.
+FeedbackMesh is built for small web application teams and independent developers who already have users, already ship on GitHub, and increasingly want AI systems to participate in the whole software loop.
 
 If code generation, PR drafting, code review, and issue execution are already becoming automatable, the bottleneck shifts upstream. Most teams still have no reliable bridge from raw user pain to machine-actionable engineering intent.
 
-SignalForge is that bridge.
+FeedbackMesh is that bridge.
 
 It turns user pain, runtime friction, and product ambiguity into evidence-backed cases that are clean enough for GitHub workflows, maintainers, and coding agents to act on with confidence.
 
-SignalForge can also be understood as:
+FeedbackMesh can also be understood as:
 
 - an AI-native feedback-to-issue harness
 - a GitHub-native case intelligence layer
@@ -50,23 +51,27 @@ The product goal is still operationally simple:
 Small-team repo-local path:
 
 ```bash
-npm run sf:init
-npm run sf:doctor
-npm run sf:start
+npm run fm:init
+npm run fm:doctor
+node scripts/feedbackmesh_cli.mjs verify
+npm run fm:start
 ```
 
 Agent-friendly setup contract:
 
+- `feedbackmesh.agent.json`
+- `feedbackmesh.integration.json`
 - `signalforge.agent.json`
 - `signalforge.integration.json`
 - `AGENT_README.md`
-- `node scripts/signalforge_cli.mjs manifest`
-- `node scripts/signalforge_cli.mjs integration`
-- `node scripts/signalforge_cli.mjs scaffold browser-preset --json`
-- `node scripts/signalforge_cli.mjs doctor --json`
+- `node scripts/feedbackmesh_cli.mjs manifest`
+- `node scripts/feedbackmesh_cli.mjs integration`
+- `node scripts/feedbackmesh_cli.mjs scaffold browser-preset --json`
+- `node scripts/feedbackmesh_cli.mjs doctor --json`
+- `node scripts/feedbackmesh_cli.mjs verify --json`
 
 <p align="center">
-  <img src="./docs/assets/signalforge-hero-image2.png" alt="SignalForge hero graphic" width="100%" />
+<img src="./docs/assets/feedbackmesh-hero-image2.png" alt="FeedbackMesh hero graphic" width="100%" />
 </p>
 
 > Plug in fast. Publish cleanly. Keep the decision loop in GitHub.
@@ -74,9 +79,13 @@ Agent-friendly setup contract:
 ## Project Status
 
 - live GitHub App publication and webhook decision sync verified
-- repo-local CLI for `sf:init`, `sf:doctor`, and `sf:start` is in place
+- repo-local CLI for `sf:init`, `sf:doctor`, `verify`, and `sf:start` is in place
+- setup-stage diagnostics, repo-aware GitHub App installation discovery, and machine-readable readiness output are implemented
+- hosted setup sessions and agent-readable onboarding contracts are available through the API
+- the hosted `Agent-First` flow at `https://sf.launchhub.icu` has been exercised end-to-end through session creation, binding confirmation, first submission, first publish, and republish idempotency on 2026-06-09
 - adapter-first integration path exists for existing web apps
 - current maturity target is serious small-team adoption, not demo-only positioning
+- `npm test` passes in a normal unrestricted environment; several `build`, `lint`, and `typecheck` scripts are still placeholders and are the main remaining engineering-surface gap
 
 Trust signals:
 
@@ -84,6 +93,7 @@ Trust signals:
 - [Omni Lingua Case Study](./docs/case-studies/omni-lingua.md)
 - [Reader Feedback Examples](./docs/case-studies/reader-feedback-to-case-examples.md)
 - [Quick Start](./docs/quick-start.md)
+- [Hosted Agent-First Flow](./docs/hosted-agent-first.md)
 - [One-Click Adoption Plan](./docs/one-click-adoption-plan.md)
 - [Release Notes](./docs/releases/v0.1.0.md)
 - [Changelog](./CHANGELOG.md)
@@ -91,7 +101,9 @@ Trust signals:
 - [Support](./SUPPORT.md)
 - [License](./LICENSE)
 
-## Why SignalForge Exists
+Compatibility note: the older `sf:*` scripts, `signalforge_*.json` files, `SIGNALFORGE_*` env vars, and `X-SignalForge-Project-Key` header still work and remain the authoritative legacy protocol surface for now.
+
+## Why FeedbackMesh Exists
 
 The software loop is being automated from the middle outward.
 
@@ -113,13 +125,13 @@ In practice, that assumption fails constantly. The real input is messy:
 - support conversations with partial context
 - runtime failures that never become coherent product work
 
-SignalForge exists to make that upstream layer usable.
+FeedbackMesh exists to make that upstream layer usable.
 
 The ambition is not to become another inbox.
 
 The ambition is to become the feedback harness that makes the rest of the software automation chain meaningfully more effective.
 
-If someone is searching for tooling around AI-native feedback triage, GitHub issue automation, user feedback aggregation, or case intelligence for coding agents, this is the category SignalForge is built for.
+If someone is searching for tooling around AI-native feedback triage, GitHub issue automation, user feedback aggregation, or case intelligence for coding agents, this is the category FeedbackMesh is built for.
 
 ## The Missing Layer In The AI-Native Stack
 
@@ -138,13 +150,13 @@ What is still weak is the upstream half:
 - repeated "something feels broken" reports
 - runtime pain disconnected from product context
 
-SignalForge sits exactly in that gap.
+FeedbackMesh sits exactly in that gap.
 
 It turns user reality into a smaller number of structured, evidence-backed cases so the rest of the automation stack has something clean to act on.
 
 ```text
 user feedback + runtime pain
--> SignalForge intake and aggregation
+-> FeedbackMesh intake and aggregation
 -> decision-ready case
 -> GitHub issue
 -> coding agent / maintainer workflow
@@ -153,7 +165,7 @@ user feedback + runtime pain
 
 | Integrate | Publish | Operate |
 | --- | --- | --- |
-| Add SignalForge to an existing web app through the adapter, widget, or direct API without reshaping the product stack. | Aggregate repeated reports into one case, then publish only when policy says the issue is ready. | Install the GitHub App, bring the bot into the repo, and keep maintainer actions inside the normal GitHub workflow. |
+| Add FeedbackMesh to an existing web app through the adapter, widget, or direct API without reshaping the product stack. | Aggregate repeated reports into one case, then publish only when policy says the issue is ready. | Install the GitHub App, bring the bot into the repo, and keep maintainer actions inside the normal GitHub workflow. |
 
 ## Why This Category Matters
 
@@ -168,7 +180,7 @@ It cannot reliably rescue a chaotic stream of raw user complaints unless somethi
 - evidence synthesis
 - policy-gated publication
 
-That is the category SignalForge is trying to define clearly: not helpdesk software, not generic issue tracking, but the harness that converts product reality into automation-ready engineering objects.
+That is the category FeedbackMesh is trying to define clearly: not helpdesk software, not generic issue tracking, but the harness that converts product reality into automation-ready engineering objects.
 
 ## Why Teams Adopt It
 
@@ -180,7 +192,7 @@ What they usually lack is a lightweight way to turn that signal into clear engin
 - buying a heavyweight support suite
 - forcing engineers into another dashboard
 
-SignalForge is meant to close that gap.
+FeedbackMesh is meant to close that gap.
 
 The bigger bet is that this becomes foundational infrastructure for AI-native product teams: not another dashboard, but the feedback harness that feeds the rest of the software automation chain.
 
@@ -188,11 +200,11 @@ The bigger bet is that this becomes foundational infrastructure for AI-native pr
 
 ### 1. Fast Integration For Existing Web Apps
 
-SignalForge is designed to sit on top of an existing app, not replace it.
+FeedbackMesh is designed to sit on top of an existing app, not replace it.
 
 You can use:
 
-- `@signalforge/adapter` for application-side integration
+- `@feedbackmesh/adapter` for application-side integration
 - the feedback widget for fast end-user capture
 - direct API ingestion for custom pipelines
 - runtime signal ingestion alongside tools like Sentry or GlitchTip
@@ -204,13 +216,13 @@ The operational goal is to feel close to "plug it in and go":
 - run the API with repo-level env
 - connect the app through the adapter
 - install the GitHub App into the target repo
-- let SignalForge publish and sync decisions through the bot workflow
+- let FeedbackMesh publish and sync decisions through the bot workflow
 
 For small teams, that matters more than deep admin surfaces.
 
 ### 3. Mature GitHub App Workflow
 
-SignalForge is intentionally GitHub-native.
+FeedbackMesh is intentionally GitHub-native.
 
 The long-term mature path is not "copy tokens around forever."
 
@@ -218,14 +230,14 @@ It is:
 
 - install the GitHub App
 - grant the repo access it needs
-- let SignalForge publish issues through the app
+- let FeedbackMesh publish issues through the app
 - let maintainers act through comments and normal GitHub review habits
 
 That is the model we want to make production-ready and boring in the best way.
 
 ### 4. Agent-Friendly By Design
 
-SignalForge is also designed for the way modern teams actually work now: a human or operator often pastes a repo URL into Codex or another agent and expects the system to wire things up correctly.
+FeedbackMesh is also designed for the way modern teams actually work now: a human or operator often pastes a repo URL into Codex or another agent and expects the system to wire things up correctly.
 
 That is why the repo includes:
 
@@ -250,12 +262,12 @@ If a product claims to be AI-native infrastructure, it should be installable not
 ## System Flow
 
 <p align="center">
-  <img src="./docs/assets/signalforge-flow-image2.png" alt="SignalForge system flow graphic" width="100%" />
+  <img src="./docs/assets/feedbackmesh-flow-image2.png" alt="FeedbackMesh system flow graphic" width="100%" />
 </p>
 
 ```text
 existing web app
--> SignalForge adapter / widget / API
+-> FeedbackMesh adapter / widget / API
 -> aggregated case
 -> GitHub App issue publication
 -> maintainer decision in GitHub
@@ -266,7 +278,7 @@ existing web app
 
 For most teams, adoption should look like this:
 
-1. run the SignalForge API
+1. run the FeedbackMesh API
 2. connect the existing web app through the adapter
 3. install the GitHub App into the repo
 4. let feedback start flowing into aggregated cases
@@ -276,14 +288,14 @@ If you want the shortest path to a working setup, start with:
 
 - `docs/quick-start.md`
 - `docs/github-app-setup.md`
-- `npm run sf:doctor`
+- `npm run fm:doctor`
 
 ## Example Integration
 
 ```js
-import { createSignalForgeAdapter } from '@signalforge/adapter';
+import { createFeedbackMeshAdapter } from '@feedbackmesh/adapter';
 
-const sf = createSignalForgeAdapter({
+const sf = createFeedbackMeshAdapter({
   endpoint: 'https://signalforge.example.com',
   projectKey: 'proj_readerapp',
   appName: 'readerapp',
@@ -303,12 +315,12 @@ sf.mountFeedbackWidget(document.getElementById('sf-root'), {
 
 ## Verified End-to-End
 
-SignalForge has already been validated against a real GitHub App flow:
+FeedbackMesh has already been validated against a real GitHub App flow:
 
 - deployed behind HTTPS at `sf.launchhub.icu`
 - real GitHub App issue publication
 - real GitHub webhook delivery
-- real owner decision sync from GitHub issue comments back into SignalForge state
+- real owner decision sync from GitHub issue comments back into FeedbackMesh state
 
 Verified flow:
 
@@ -318,14 +330,14 @@ feedback submission
 -> GitHub App issue publish
 -> owner comments /accept or /defer
 -> GitHub webhook
--> SignalForge decision record + case status update
+-> FeedbackMesh decision record + case status update
 ```
 
 See `docs/live-e2e.md` for deployment notes, verification details, and known gaps.
 
 ## Why It Feels Different
 
-SignalForge is opinionated about one thing:
+FeedbackMesh is opinionated about one thing:
 
 the goal is not to create more tickets.
 
@@ -342,7 +354,7 @@ The point is not to make the feedback layer louder.
 
 The point is to make the upstream automation boundary finally trustworthy.
 
-## What SignalForge Is
+## What FeedbackMesh Is
 
 - the intake and aggregation layer for AI-native software delivery
 - a lightweight feedback ops layer for existing web apps
@@ -350,7 +362,7 @@ The point is to make the upstream automation boundary finally trustworthy.
 - a bot-friendly issue publication and decision loop
 - an automation handoff point for agents and workflows
 
-## What SignalForge Is Not
+## What FeedbackMesh Is Not
 
 - a full support desk
 - a full issue tracker
@@ -380,12 +392,12 @@ That is the maturity bar.
 
 ## Runtime Signals
 
-SignalForge does not try to replace mature exception monitoring tools.
+FeedbackMesh does not try to replace mature exception monitoring tools.
 
 Recommended layering:
 
 - Sentry or GlitchTip for runtime collection
-- SignalForge for aggregation, case correlation, publication, and orchestration
+- FeedbackMesh for aggregation, case correlation, publication, and orchestration
 
 ## Why Now
 
@@ -393,11 +405,11 @@ The industry is rapidly getting good at automating work after a good issue alrea
 
 The unresolved problem is how to create that good issue from noisy reality, repeatedly, safely, and with enough structure that agents can keep going.
 
-That is the layer SignalForge is trying to make real.
+That is the layer FeedbackMesh is trying to make real.
 
 ## Built For Small Teams
 
-SignalForge is deliberately shaped for the teams that feel this gap most sharply:
+FeedbackMesh is deliberately shaped for the teams that feel this gap most sharply:
 
 - startups with one main web product
 - indie developers shipping fast on GitHub
@@ -430,7 +442,7 @@ They need fast integration, a GitHub-native workflow, and a system that starts c
 
 ## LLM Setup
 
-SignalForge can run in two modes:
+FeedbackMesh can run in two modes:
 
 - heuristic fallback only
 - DeepSeek-backed LLM triage
@@ -443,7 +455,7 @@ DEEPSEEK_BASE_URL=https://api.deepseek.com
 DEEPSEEK_MODEL=deepseek-v4-flash
 ```
 
-If no key is configured, SignalForge continues using heuristic triage.
+If no key is configured, FeedbackMesh continues using heuristic triage.
 
 For local startup with a repo-level `.env`, run:
 

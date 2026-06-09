@@ -1,6 +1,6 @@
 # Contributing
 
-SignalForge is not trying to become another generic ticketing layer.
+FeedbackMesh is not trying to become another generic ticketing layer.
 
 It is a GitHub-native case intelligence system that turns noisy feedback into fewer, higher-value engineering decisions.
 
@@ -40,13 +40,13 @@ Make sure the change answers at least one of these questions:
 - does this help collapse noise into clearer cases?
 - does this help maintainers make a faster decision?
 - does this improve real-world adoption or integration?
-- does this preserve the GitHub-native product shape of SignalForge?
+- does this preserve the GitHub-native product shape of FeedbackMesh?
 
 If the answer is no, the change may still be useful, but it should be justified clearly.
 
 ## Development Direction
 
-SignalForge is currently strongest when used as:
+FeedbackMesh is currently strongest when used as:
 
 - a feedback-to-issue engine
 - an aggregation-aware triage layer

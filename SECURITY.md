@@ -2,7 +2,7 @@
 
 ## Supported Scope
 
-SignalForge is early-stage software, but responsible disclosure is still expected.
+FeedbackMesh is early-stage software, but responsible disclosure is still expected.
 
 The most security-sensitive areas currently include:
 
@@ -32,7 +32,7 @@ Include:
 
 ## Current Security Posture
 
-SignalForge is actively hardening:
+FeedbackMesh is actively hardening:
 
 - GitHub App auth handling
 - webhook validation and auditability

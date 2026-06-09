@@ -1,6 +1,6 @@
 # Vision
 
-SignalForge exists to turn scattered user pain into decision-ready engineering work.
+FeedbackMesh exists to turn scattered user pain into decision-ready engineering work.
 
 The larger opportunity is bigger than feedback management.
 
@@ -15,7 +15,7 @@ What remains poorly solved is the upstream conversion step.
 
 Before any of that automation matters, someone has to transform noisy user reality into a clean engineering object.
 
-SignalForge is designed to own that boundary.
+FeedbackMesh is designed to own that boundary.
 
 Modern product teams already have the raw signals:
 
@@ -35,7 +35,7 @@ That is still mostly manual across the industry.
 
 Too many teams still move from "users are unhappy" to "someone should maybe open an issue" through a loose, manual, low-trust workflow.
 
-SignalForge is designed to replace that with a tighter path:
+FeedbackMesh is designed to replace that with a tighter path:
 
 ```text
 raw feedback
@@ -49,12 +49,12 @@ In simpler terms:
 
 ```text
 user reality
--> SignalForge aggregation and synthesis
+-> FeedbackMesh aggregation and synthesis
 -> GitHub-native decision surface
 -> automation / agent execution
 ```
 
-SignalForge is the missing harness between product pain and code automation.
+FeedbackMesh is the missing harness between product pain and code automation.
 
 ## What We Believe
 
@@ -67,7 +67,7 @@ SignalForge is the missing harness between product pain and code automation.
 
 ## Product Shape
 
-SignalForge is:
+FeedbackMesh is:
 
 - a feedback-to-issue engine
 - a case intelligence layer
@@ -75,7 +75,7 @@ SignalForge is:
 - a GitHub-native maintainer workflow
 - an orchestration boundary for follow-up automation
 
-SignalForge is not:
+FeedbackMesh is not:
 
 - a support desk
 - a generic issue tracker
@@ -90,7 +90,7 @@ Without synthesis, they accumulate vague tickets.
 
 Without a publication boundary, they accumulate unresolved intent.
 
-SignalForge is meant to create fewer artifacts, but better ones.
+FeedbackMesh is meant to create fewer artifacts, but better ones.
 
 That is the core bet:
 
@@ -100,7 +100,7 @@ And in an AI-native operating model, better cases are not just nicer documentati
 
 ```text
 user pain
--> SignalForge case
+-> FeedbackMesh case
 -> GitHub issue
 -> agent / maintainer execution
 -> shipped fix
@@ -118,13 +118,13 @@ The near-term goal is straightforward:
 
 ## Long-Term Direction
 
-Long term, SignalForge should feel like infrastructure for product feedback operations:
+Long term, FeedbackMesh should feel like infrastructure for product feedback operations:
 
 - ingestion at the edge
 - aggregation in the middle
 - GitHub as the decision surface
 - automation and agents downstream
 
-The winning version of SignalForge is not the one that stores the most data.
+The winning version of FeedbackMesh is not the one that stores the most data.
 
 It is the one that helps a team decide what matters next and gives the downstream automation stack something solid to execute on.

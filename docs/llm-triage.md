@@ -1,6 +1,6 @@
 # LLM Triage
 
-SignalForge should use the LLM for first-pass semantic triage of raw user feedback.
+FeedbackMesh should use the LLM for first-pass semantic triage of raw user feedback.
 
 The goal is not to let the model decide product truth.
 
@@ -16,7 +16,7 @@ The goal is to turn noisy raw input into decision-ready engineering language.
 
 ## Product Bias
 
-SignalForge should bias toward user feedback as the primary product signal.
+FeedbackMesh should bias toward user feedback as the primary product signal.
 
 - user-reported friction, confusion, blocked flows, awkward interaction, readability problems, and repeated annoyance should be treated as high-value triage inputs
 - runtime exceptions are important, but default to supporting evidence unless the failure is clearly severe
@@ -78,7 +78,7 @@ Recommended shape:
 
 ## Publish Bias
 
-SignalForge should prefer a lenient publication bias.
+FeedbackMesh should prefer a lenient publication bias.
 
 That means:
 
@@ -96,7 +96,7 @@ not for minimizing issue count at all costs.
 
 ## Fallback Rules
 
-If the LLM is unavailable, SignalForge should fall back to deterministic heuristics.
+If the LLM is unavailable, FeedbackMesh should fall back to deterministic heuristics.
 
 Fallback should still preserve:
 

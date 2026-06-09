@@ -51,7 +51,7 @@
       "verification": {
         "repoCommand": "node scripts/run_readerapp_feedback_sample.mjs",
         "expected": [
-          "feedback reaches SignalForge",
+          "feedback reaches FeedbackMesh",
           "cases are created or merged",
           "the inbox is reviewable through the API"
         ]
@@ -88,17 +88,23 @@
     "preferMode": "browser_preset",
     "doNotAssumeHostedService": true,
     "readBeforePatch": [
-      "signalforge.agent.json",
+      "feedbackmesh.agent.json",
       "AGENT_README.md",
       "docs/quick-start.md"
     ],
+    "legacyReadBeforePatch": [
+      "signalforge.agent.json"
+    ],
     "scaffoldCommands": [
-      "node scripts/signalforge_cli.mjs scaffold browser-preset --json",
-      "node scripts/signalforge_cli.mjs scaffold react-preset --json"
+      "node scripts/feedbackmesh_cli.mjs scaffold browser-preset --json",
+      "node scripts/feedbackmesh_cli.mjs scaffold react-preset --json"
     ],
     "verifyAfterPatch": [
-      "npm run sf:doctor",
+      "npm run fm:doctor",
       "node scripts/run_readerapp_feedback_sample.mjs"
+    ],
+    "legacyVerifyAfterPatch": [
+      "npm run sf:doctor"
     ],
     "referenceTemplates": [
       "examples/agent/browser-preset/",

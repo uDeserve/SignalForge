@@ -1,6 +1,6 @@
-import { installSignalForgePreset } from '@signalforge/adapter';
+import { installFeedbackMeshPreset } from '@feedbackmesh/adapter';
 
-installSignalForgePreset({
+installFeedbackMeshPreset({
   endpoint: 'https://signalforge.example.com',
   projectKey: 'proj_readerapp',
   appName: 'readerapp',

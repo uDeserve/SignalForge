@@ -30,7 +30,7 @@ The fastest-to-resolve reports usually include:
 
 ## Product Focus
 
-SignalForge is optimized first for:
+FeedbackMesh is optimized first for:
 
 - small web application teams
 - independent developers

@@ -1,6 +1,6 @@
 # Architecture
 
-SignalForge is designed as a case intelligence layer between noisy product signals and GitHub-native engineering action.
+FeedbackMesh is designed as a case intelligence layer between noisy product signals and GitHub-native engineering action.
 
 The architecture is intentionally opinionated:
 
@@ -26,7 +26,7 @@ This matters because most teams already know how to collect feedback.
 
 What they do not have is a clean architectural boundary between collection, case formation, publication, and action.
 
-SignalForge creates that boundary.
+FeedbackMesh creates that boundary.
 
 ## Core Layers
 
@@ -53,7 +53,7 @@ Typical responsibilities:
 
 ## 2. Triage And Aggregation Layer
 
-This is the core of SignalForge.
+This is the core of FeedbackMesh.
 
 The system should not treat every submission as a future issue.
 
@@ -98,7 +98,7 @@ Those should not collapse into one table-shaped idea.
 
 Publication is a policy decision, not an incidental side effect.
 
-SignalForge should evaluate whether a case is ready to publish based on:
+FeedbackMesh should evaluate whether a case is ready to publish based on:
 
 - actionability
 - source quality
@@ -124,7 +124,7 @@ That boundary owns:
 - issue creation
 - comment capture inputs
 
-SignalForge itself should continue to own:
+FeedbackMesh itself should continue to own:
 
 - case formation
 - issue rendering
@@ -143,7 +143,7 @@ It also allows multiple publication modes:
 
 Issue creation is not the final decision.
 
-SignalForge treats maintainer action as a separate state transition after publication.
+FeedbackMesh treats maintainer action as a separate state transition after publication.
 
 That distinction matters because:
 
@@ -159,7 +159,7 @@ The system should therefore preserve separate state for:
 
 ## 7. Downstream Execution Layer
 
-After a maintainer decision, SignalForge can hand off context to:
+After a maintainer decision, FeedbackMesh can hand off context to:
 
 - engineers
 - automation jobs
@@ -186,7 +186,7 @@ It may help with:
 
 But correctness must survive LLM failure.
 
-If the model is unavailable or returns invalid structure, SignalForge should still produce safe results through deterministic fallback behavior.
+If the model is unavailable or returns invalid structure, FeedbackMesh should still produce safe results through deterministic fallback behavior.
 
 ## Design Rules
 

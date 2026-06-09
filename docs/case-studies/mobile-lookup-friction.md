@@ -2,8 +2,8 @@
 
 This case is derived from real Omni Lingua integration context already present in the repository:
 
-- structured reader feedback reasons such as `查词不顺手`, `布局不舒服`, and `手机端体验不好`
-- SignalForge bridge test payload text such as `手机上查词弹层太难点`
+- structured reader feedback reasons around lookup friction, layout discomfort, and weak mobile experience
+- FeedbackMesh bridge test payload text describing a mobile lookup popup that is hard to use
 - mobile optimization notes focused on popup behavior and touch ergonomics
 
 The point is not that one exact sentence matters.
@@ -25,7 +25,7 @@ On their own, these reports are easy to dismiss as:
 - wording differences across users
 - mobile-specific edge cases
 
-## Why This Is A Good SignalForge Case
+## Why This Is A Good FeedbackMesh Case
 
 This is exactly the kind of product friction that traditional issue flow handles poorly:
 
@@ -34,13 +34,13 @@ This is exactly the kind of product friction that traditional issue flow handles
 - some mention layout, some mention lookup, some mention mobile
 - none of them alone is the full engineering story
 
-SignalForge is supposed to collapse those signals into one case such as:
+FeedbackMesh is supposed to collapse those signals into one case such as:
 
 ```text
 Mobile lookup popup blocks or interrupts reading flow
 ```
 
-## What SignalForge Should Preserve
+## What FeedbackMesh Should Preserve
 
 A good aggregated case should keep:
 
@@ -65,7 +65,7 @@ For a coding-agent workflow, it creates something much more usable than raw comm
 
 This case write-up is based on repository-visible Omni Lingua materials:
 
-- the SignalForge bridge service test payload
+- the FeedbackMesh bridge service test payload
 - the reader feedback reason taxonomy in the frontend
 - the mobile optimization documentation
 

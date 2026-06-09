@@ -1,11 +1,11 @@
 {
-  "name": "@signalforge/mcp-server",
+  "name": "@feedbackmesh/mcp-server",
   "private": true,
   "version": "0.1.0",
-  "description": "MCP server surface for querying SignalForge cases and automation context.",
+  "description": "MCP server surface for querying FeedbackMesh cases and automation context.",
   "type": "module",
   "keywords": [
-    "signalforge",
+    "feedbackmesh",
     "mcp",
     "model-context-protocol",
     "coding-agents",

@@ -7,7 +7,7 @@ These are useful for:
 - README proof points
 - release notes
 - launch posts
-- explaining SignalForge to other product teams
+- explaining FeedbackMesh to other product teams
 
 ## Example 1
 
@@ -69,7 +69,7 @@ Why it matters:
 These examples are derived from:
 
 - Omni Lingua feedback reason taxonomy
-- Omni Lingua SignalForge bridge tests
+- Omni Lingua FeedbackMesh bridge tests
 - Omni Lingua incident and verification documents
 
 They are intended as faithful case shapes, not as inflated claims about precise historical frequency.

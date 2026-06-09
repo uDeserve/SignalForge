@@ -40,15 +40,15 @@ test('github app turns owner commands into decisions', async () => {
   });
   store.upsertCase(caseRecord, 'fingerprint-1');
   store.savePublication(createIssuePublication(caseRecord, {
-    repo: 'uDeserve/SignalForge',
+    repo: 'uDeserve/FeedbackMesh',
     externalId: 'issue_1',
-    url: 'https://github.com/uDeserve/SignalForge/issues/1',
+    url: 'https://github.com/uDeserve/FeedbackMesh/issues/1',
     number: 1,
   }));
 
   const payload = {
     action: 'created',
-    repository: { full_name: 'uDeserve/SignalForge' },
+    repository: { full_name: 'uDeserve/FeedbackMesh' },
     issue: { number: 1, state: 'open', title: 'Save freezes', body: '...' },
     comment: { body: '/accept' },
     sender: { login: 'alice' },
@@ -85,15 +85,15 @@ test('github app syncs issue close events back to the case', async () => {
   });
   store.upsertCase(caseRecord, 'fingerprint-2');
   store.savePublication(createIssuePublication(caseRecord, {
-    repo: 'uDeserve/SignalForge',
+    repo: 'uDeserve/FeedbackMesh',
     externalId: 'issue_2',
-    url: 'https://github.com/uDeserve/SignalForge/issues/2',
+    url: 'https://github.com/uDeserve/FeedbackMesh/issues/2',
     number: 2,
   }));
 
   const payload = {
     action: 'closed',
-    repository: { full_name: 'uDeserve/SignalForge' },
+    repository: { full_name: 'uDeserve/FeedbackMesh' },
     issue: { number: 2, state: 'closed', title: 'Save freezes', body: '...' },
     sender: { login: 'alice' },
   };

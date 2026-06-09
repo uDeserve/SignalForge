@@ -7,13 +7,14 @@ from openai import OpenAI
 
 
 DEFAULT_PROMPT = (
-    "Create a premium horizontal system-flow graphic for an open source developer tool named SignalForge. "
-    "Audience: engineers and product teams on GitHub. "
+    "Create a premium horizontal system-flow graphic for an open source developer tool named FeedbackMesh. "
+    "Audience: engineers, coding agents, and product teams on GitHub. "
     "Tone: refined, modern, minimal, high-end open-source infrastructure aesthetic. "
     "Use a bright editorial product-diagram style with soft slate, blue-cyan, and mint accents. "
-    "Show a left-to-right flow with three grouped inputs on the left labeled feedback intake, runtime signals, and context layer; "
-    "a central dark case intelligence layer card in the middle; and two output cards on the right labeled GitHub issue and maintainer loop. "
+    "Show a left-to-right flow with grouped inputs on the left labeled feedback intake, runtime signals, context layer, and agent-first install contract; "
+    "a central dark FeedbackMesh case intelligence layer card in the middle; and output cards on the right labeled GitHub issue, maintainer loop, and agent execution handoff. "
     "Use crisp UI-card composition, elegant connector lines, readable English labels only, no watermark, no other brand logos, no purple bias. "
+    "Make the agent-first feeling explicit through setup-session, contract, or install-path cues while keeping the diagram product-grade rather than busy. "
     "The graphic should feel like a polished launch asset from a top-tier open source infra project, not a generic infographic."
 )
 

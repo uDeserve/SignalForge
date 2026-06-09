@@ -1,6 +1,6 @@
 # Object Model
 
-SignalForge centers on `FeedbackCase`, not raw feedback and not GitHub issues.
+FeedbackMesh centers on `FeedbackCase`, not raw feedback and not GitHub issues.
 
 Core objects:
 

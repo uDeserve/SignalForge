@@ -1,6 +1,6 @@
 # Privacy
 
-SignalForge must treat screenshots, logs, URLs, and free-form feedback text as potentially sensitive.
+FeedbackMesh must treat screenshots, logs, URLs, and free-form feedback text as potentially sensitive.
 
 Default policy:
 

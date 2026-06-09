@@ -80,7 +80,7 @@ feedback -> case -> GitHub issue -> owner comment -> webhook -> case update
 
 ## What This Proves
 
-- SignalForge is already usable as a GitHub-native owner decision surface
+- FeedbackMesh is already usable as a GitHub-native owner decision surface
 - the "publish first, owner decides once" model works in practice
 - GitHub App auth is viable for the publication layer
 - issue comments are a workable command surface for the first execution loop
@@ -101,7 +101,7 @@ Still missing:
 
 - the most common GitHub App setup mistake is subscribing only to `Issues` and forgetting `Issue comment`
 - SSL verification should stay enabled when the endpoint is served behind valid HTTPS
-- SignalForge should log webhook event names and decision outcomes explicitly to reduce debugging time
+- FeedbackMesh should log webhook event names and decision outcomes explicitly to reduce debugging time
 
 ## Recommended Next Build Steps
 

@@ -629,6 +629,10 @@ export function createSignalForgeAdapter(options = {}) {
   return installSignalForge(options);
 }
 
+export function createFeedbackMeshAdapter(options = {}) {
+  return installSignalForge(options);
+}
+
 export function installSignalForgeBrowser({
   endpoint,
   projectKey,
@@ -723,4 +727,16 @@ export function installSignalForgePreset({
           ? { selector: feedbackRoot, ...feedback }
           : feedbackRoot,
   });
+}
+
+export function installFeedbackMeshPreset(options = {}) {
+  return installSignalForgePreset(options);
+}
+
+export function installFeedbackMeshBrowser(options = {}) {
+  return installSignalForgeBrowser(options);
+}
+
+export function createFeedbackMeshContext(options = {}) {
+  return createSignalForgeContext(options);
 }

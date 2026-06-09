@@ -1,11 +1,11 @@
 {
-  "name": "@signalforge/core",
+  "name": "@feedbackmesh/core",
   "private": true,
   "version": "0.1.0",
-  "description": "Core case intelligence primitives for the SignalForge feedback-to-issue pipeline.",
+  "description": "Core case intelligence primitives for the FeedbackMesh feedback-to-issue pipeline.",
   "type": "module",
   "keywords": [
-    "signalforge",
+    "feedbackmesh",
     "case-intelligence",
     "feedback-to-issue",
     "developer-tools"
