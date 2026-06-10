@@ -34,10 +34,12 @@
   "scripts": {
     "fm:init": "node scripts/feedbackmesh_cli.mjs init",
     "fm:doctor": "node scripts/feedbackmesh_cli.mjs doctor",
+    "fm:hosted": "node scripts/feedbackmesh_hosted_setup.mjs",
     "fm:start": "node scripts/feedbackmesh_cli.mjs start",
     "fm:verify": "node scripts/feedbackmesh_cli.mjs verify",
     "sf:init": "node scripts/signalforge_cli.mjs init",
     "sf:doctor": "node scripts/signalforge_cli.mjs doctor",
+    "sf:hosted": "node scripts/signalforge_hosted_setup.mjs",
     "sf:start": "node scripts/signalforge_cli.mjs start",
     "dev": "node apps/api/src/index.js",
     "build": "node -e \"console.log('build placeholder')\"",

@@ -18,6 +18,12 @@ Use this path when:
 - an agent needs to onboard a product into that hosted service
 - GitHub App installation still requires a human click, but the rest of the flow should stay machine-readable
 
+The repo now includes a minimal helper for this flow:
+
+```bash
+npm run fm:hosted -- create --name "Omni Lingua" --app-name omni_lingua --repo uDeserve/omni_lingua
+```
+
 ## Current Happy Path
 
 1. `POST /setup/sessions`

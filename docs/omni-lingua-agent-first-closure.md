@@ -38,6 +38,34 @@ These steps still need to happen on the real example repo:
 7. Publish the first case and record the GitHub issue URL.
 8. Leave a maintainer command on that issue and confirm the case state changes.
 
+## Ready-To-Run Commands
+
+Create the Omni Lingua hosted session:
+
+```bash
+npm run fm:hosted -- create --name "Omni Lingua" --app-name omni_lingua --repo uDeserve/omni_lingua
+```
+
+Read the latest setup state:
+
+```bash
+npm run fm:hosted -- status --session <sessionId>
+```
+
+Read the machine-readable agent contract:
+
+```bash
+npm run fm:hosted -- contract --session <sessionId>
+```
+
+Only if auto-detection does not complete, confirm the binding manually:
+
+```bash
+npm run fm:hosted -- confirm-binding --session <sessionId> --repo uDeserve/omni_lingua --binding-code <sfbind_code>
+```
+
+The `create` command prints the exact `VITE_SIGNALFORGE_ENDPOINT`, `VITE_SIGNALFORGE_PROJECT_KEY`, and `VITE_SIGNALFORGE_APP_NAME` values that should be patched into Omni Lingua.
+
 ## Exit Criteria
 
 Treat this closure as complete only when all of these artifacts exist:
