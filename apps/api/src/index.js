@@ -54,6 +54,15 @@ function dedupe(values = []) {
   return [...new Set(values.filter(Boolean))];
 }
 
+function escapeHtml(value = '') {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
 function parseCasesQuery(url) {
   const target = new URL(url, 'http://signalforge.local');
   const publishedParam = target.searchParams.get('published');
@@ -75,6 +84,193 @@ function buildExistingClusterHints(cases = []) {
     runtimeEventCount: caseRecord.evidenceSummary?.runtimeEventCount ?? 0,
     sourceKind: caseRecord.metadata?.sourceKind ?? '',
   }));
+}
+
+function renderSetupPage({ publicBaseUrl, installUrl = '', query = {} }) {
+  const installationId = escapeHtml(query.installation_id ?? '');
+  const setupAction = escapeHtml(query.setup_action ?? '');
+  const repoSelection = escapeHtml(query.repository_selection ?? '');
+  const installLine = installUrl
+    ? `<p><a class="button secondary" href="${escapeHtml(installUrl)}">Open GitHub App Install</a></p>`
+    : '';
+
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FeedbackMesh Setup</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f5f1ea;
+        --surface: #ffffff;
+        --ink: #102036;
+        --muted: #5a6b81;
+        --line: #d8e2ee;
+        --accent: #1d63ff;
+        --accent-2: #18b7b0;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+        background:
+          radial-gradient(circle at top left, rgba(29,99,255,0.12), transparent 32%),
+          radial-gradient(circle at top right, rgba(24,183,176,0.12), transparent 30%),
+          var(--bg);
+        color: var(--ink);
+      }
+      main {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 48px 20px 72px;
+      }
+      .hero, .card {
+        background: rgba(255,255,255,0.92);
+        backdrop-filter: blur(8px);
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        box-shadow: 0 18px 50px rgba(16,32,54,0.08);
+      }
+      .hero { padding: 36px; margin-bottom: 24px; }
+      .eyebrow {
+        margin: 0 0 10px;
+        color: var(--accent);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+      h1 {
+        margin: 0 0 12px;
+        font-size: clamp(34px, 5vw, 56px);
+        line-height: 1;
+      }
+      .lede {
+        margin: 0;
+        color: var(--muted);
+        font-size: 18px;
+        line-height: 1.6;
+        max-width: 760px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 20px;
+      }
+      .card { padding: 24px; }
+      h2 {
+        margin: 0 0 12px;
+        font-size: 22px;
+      }
+      p, li {
+        color: var(--muted);
+        line-height: 1.6;
+      }
+      ol, ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+      code {
+        background: #eef4fb;
+        color: #183153;
+        border-radius: 8px;
+        padding: 2px 6px;
+      }
+      .meta {
+        display: grid;
+        gap: 10px;
+        margin-top: 18px;
+      }
+      .meta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: baseline;
+      }
+      .meta-label {
+        min-width: 128px;
+        font-weight: 600;
+        color: var(--ink);
+      }
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
+        padding: 0 18px;
+        border-radius: 999px;
+        border: 1px solid transparent;
+        background: var(--accent);
+        color: #fff;
+        text-decoration: none;
+        font-weight: 600;
+      }
+      .button.secondary {
+        background: transparent;
+        color: var(--accent);
+        border-color: rgba(29,99,255,0.24);
+      }
+      .links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 18px;
+      }
+      .note {
+        margin-top: 18px;
+        padding: 14px 16px;
+        border-radius: 16px;
+        background: #f8fbff;
+        border: 1px solid #d9e9ff;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="hero">
+        <p class="eyebrow">FeedbackMesh Setup</p>
+        <h1>GitHub App Installed. Complete The Agent-First Loop.</h1>
+        <p class="lede">
+          FeedbackMesh is ready to receive real product feedback, publish decision-ready GitHub issues,
+          and keep maintainer decisions inside GitHub. Use this page as the post-install landing surface
+          before returning to your setup session or target app patch.
+        </p>
+        <div class="links">
+          <a class="button" href="${escapeHtml(publicBaseUrl)}/setup/status">Open Setup Status</a>
+          <a class="button secondary" href="${escapeHtml(publicBaseUrl)}/projects">List Hosted Projects</a>
+        </div>
+      </section>
+      <section class="grid">
+        <article class="card">
+          <h2>Recommended Next Steps</h2>
+          <ol>
+            <li>Return to the active setup session and refresh it.</li>
+            <li>Confirm the GitHub App installation was detected for the target repository.</li>
+            <li>Patch the target app with <code>VITE_SIGNALFORGE_ENDPOINT</code>, <code>VITE_SIGNALFORGE_PROJECT_KEY</code>, and <code>VITE_SIGNALFORGE_APP_NAME</code>.</li>
+            <li>Send the first real submission and verify case creation or publish readiness.</li>
+          </ol>
+          ${installLine}
+        </article>
+        <article class="card">
+          <h2>Install Metadata</h2>
+          <div class="meta">
+            <div class="meta-row"><span class="meta-label">Installation ID</span><span>${installationId || 'Not provided in redirect'}</span></div>
+            <div class="meta-row"><span class="meta-label">Setup Action</span><span>${setupAction || 'Not provided in redirect'}</span></div>
+            <div class="meta-row"><span class="meta-label">Repo Selection</span><span>${repoSelection || 'Not provided in redirect'}</span></div>
+          </div>
+          <div class="note">
+            If auto-detection does not complete, recover through the existing setup session APIs:
+            <code>/setup/sessions/:id</code>,
+            <code>/setup/sessions/:id/agent-contract</code>,
+            and <code>/setup/sessions/:id/github-binding</code>.
+          </div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>`;
 }
 
 function slugifyProjectName(name = '') {
@@ -1295,6 +1491,24 @@ export function createSignalForgeApi({
     try {
       const project = resolveProjectFromHeaders(headers);
 
+      if (method === 'GET' && url?.startsWith('/setup')) {
+        const route = new URL(url, 'http://signalforge.local');
+        if (route.pathname === '/setup') {
+          const installUrl = buildGitHubAppInstallUrl(env);
+          return {
+            statusCode: 200,
+            body: renderSetupPage({
+              publicBaseUrl,
+              installUrl,
+              query: Object.fromEntries(route.searchParams.entries()),
+            }),
+            headers: {
+              'content-type': 'text/html; charset=utf-8',
+            },
+          };
+        }
+      }
+
       if (method === 'GET' && url === '/health') {
         return { statusCode: 200, body: { ok: true } };
       }
@@ -1784,8 +1998,13 @@ export function createSignalForgeApi({
       res.end(JSON.stringify({ error: result.error }));
       return;
     }
-    res.writeHead(result.statusCode, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({ data: result.body }));
+      if (result.headers?.['content-type']?.startsWith('text/html')) {
+        res.writeHead(result.statusCode, result.headers);
+        res.end(result.body);
+        return;
+      }
+      res.writeHead(result.statusCode, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ data: result.body }));
   });
 
   return { server, store, handleRequest };

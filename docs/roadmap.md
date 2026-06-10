@@ -123,7 +123,7 @@ Hosted validation as of `2026-06-09`:
 - `GET /projects` -> `200`
 - `POST /setup/sessions` -> `201`
 - `GET /setup/sessions/:id/agent-contract` -> `200`
-- full remote flow already validated through first publish and republish idempotency on `https://sf.launchhub.icu`
+- full remote flow already validated through first publish and republish idempotency on `https://feedbackmesh.launchhub.icu`
 
 ### Operator-First Track
 

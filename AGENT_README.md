@@ -143,7 +143,7 @@ This path is meant for agents that need to pause on human GitHub App installatio
 
 The currently verified hosted deployment is:
 
-- endpoint: `https://sf.launchhub.icu`
+- endpoint: `https://feedbackmesh.launchhub.icu`
 - status: real session creation, binding confirmation, first publish, and republish idempotency validated on 2026-06-09
 - workflow doc: `docs/hosted-agent-first.md`
 

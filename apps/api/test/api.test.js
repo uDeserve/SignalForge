@@ -254,6 +254,32 @@ test('api exposes shared setup status for install and verification flows', async
   assert.equal(Array.isArray(response.body.checks), true);
 });
 
+test('setup page renders a hosted post-install landing page', async () => {
+  const api = createSignalForgeApi({
+    store: createStore(':memory:'),
+    logger: { error() {}, warn() {} },
+    env: {
+      SIGNALFORGE_PUBLIC_BASE_URL: 'https://feedbackmesh.launchhub.icu',
+      GITHUB_APP_SLUG: 'signalforge',
+    },
+  });
+
+  const response = await api.handleRequest({
+    method: 'GET',
+    url: '/setup?installation_id=12345&setup_action=install&repository_selection=selected',
+    body: {},
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.headers['content-type'], 'text/html; charset=utf-8');
+  assert.match(response.body, /FeedbackMesh Setup/);
+  assert.match(response.body, /GitHub App Installed\. Complete The Agent-First Loop\./);
+  assert.match(response.body, /Installation ID/);
+  assert.match(response.body, /12345/);
+  assert.match(response.body, /https:\/\/github\.com\/apps\/signalforge\/installations\/new/);
+  assert.match(response.body, /https:\/\/feedbackmesh\.launchhub\.icu\/setup\/status/);
+});
+
 test('hosted onboarding can create a project with reusable client config', async () => {
   const api = createSignalForgeApi({
     store: createStore(':memory:'),

@@ -82,7 +82,8 @@ Agent-friendly setup contract:
 - repo-local CLI for `sf:init`, `sf:doctor`, `verify`, and `sf:start` is in place
 - setup-stage diagnostics, repo-aware GitHub App installation discovery, and machine-readable readiness output are implemented
 - hosted setup sessions and agent-readable onboarding contracts are available through the API
-- the hosted `Agent-First` flow at `https://sf.launchhub.icu` has been exercised end-to-end through session creation, binding confirmation, first submission, first publish, and republish idempotency on 2026-06-09
+- the hosted deployment now serves a real post-install landing page at `GET /setup` for GitHub App `Setup URL` redirects
+- the hosted `Agent-First` flow at `https://feedbackmesh.launchhub.icu` has been exercised end-to-end through session creation, binding confirmation, first submission, first publish, and republish idempotency on 2026-06-09
 - adapter-first integration path exists for existing web apps
 - current maturity target is serious small-team adoption, not demo-only positioning
 - `npm test` passes in a normal unrestricted environment; several `build`, `lint`, and `typecheck` scripts are still placeholders and are the main remaining engineering-surface gap
@@ -94,6 +95,7 @@ Trust signals:
 - [Reader Feedback Examples](./docs/case-studies/reader-feedback-to-case-examples.md)
 - [Quick Start](./docs/quick-start.md)
 - [Hosted Agent-First Flow](./docs/hosted-agent-first.md)
+- [Deployment Guide](./docs/deployment.md)
 - [One-Click Adoption Plan](./docs/one-click-adoption-plan.md)
 - [Release Notes](./docs/releases/v0.1.0.md)
 - [Changelog](./CHANGELOG.md)
@@ -317,7 +319,7 @@ sf.mountFeedbackWidget(document.getElementById('sf-root'), {
 
 FeedbackMesh has already been validated against a real GitHub App flow:
 
-- deployed behind HTTPS at `sf.launchhub.icu`
+- deployed behind HTTPS at `feedbackmesh.launchhub.icu`
 - real GitHub App issue publication
 - real GitHub webhook delivery
 - real owner decision sync from GitHub issue comments back into FeedbackMesh state
@@ -333,7 +335,7 @@ feedback submission
 -> FeedbackMesh decision record + case status update
 ```
 
-See `docs/live-e2e.md` for deployment notes, verification details, and known gaps.
+See `docs/deployment.md` for the current hosted reverse-proxy shape, and `docs/live-e2e.md` for verification details and known gaps.
 
 ## Why It Feels Different
 
@@ -433,6 +435,7 @@ They need fast integration, a GitHub-native workflow, and a system that starts c
 - `docs/api-contract.md`
 - `docs/github-flow.md`
 - `docs/github-app-setup.md`
+- `docs/deployment.md`
 - `docs/privacy.md`
 - `docs/mvp.md`
 - `docs/architecture.md`

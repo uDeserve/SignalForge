@@ -27,7 +27,7 @@ If you want a single repo URL target, point it to:
 
 Current proof point mentioned in docs:
 
-- `https://sf.launchhub.icu`
+- `https://feedbackmesh.launchhub.icu`
 
 Only use that as the repository website if you want the repo to emphasize live product credibility over code-first positioning.
 

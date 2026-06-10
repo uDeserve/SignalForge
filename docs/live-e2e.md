@@ -1,10 +1,10 @@
 # Live E2E Verification
 
-This document records the first real SignalForge deployment and end-to-end verification run.
+This document records the first real FeedbackMesh deployment and end-to-end verification run.
 
 ## Goal
 
-Prove that SignalForge works as a real operator loop, not only as local mocks or script-level tests.
+Prove that FeedbackMesh works as a real operator loop, not only as local mocks or script-level tests.
 
 The target validation was:
 
@@ -12,11 +12,11 @@ The target validation was:
 - triage it into a case
 - publish a real GitHub issue
 - capture a real maintainer decision from a GitHub issue comment
-- sync that decision back into the SignalForge case store
+- sync that decision back into the FeedbackMesh case store
 
 ## Deployed Topology
 
-- public domain: `https://sf.launchhub.icu`
+- public domain: `https://feedbackmesh.launchhub.icu`
 - API health endpoint: `GET /health`
 - GitHub webhook endpoint: `POST /webhooks/github`
 - reverse proxy: Caddy
@@ -59,8 +59,8 @@ Real decision sync was also confirmed:
 
 - a case was published into GitHub
 - the maintainer commented on the issue with a slash command
-- SignalForge received the real GitHub webhook
-- SignalForge stored a decision record
+- FeedbackMesh received the real GitHub webhook
+- FeedbackMesh stored a decision record
 - the case status changed in the API store
 
 One verified sequence was:
@@ -68,7 +68,7 @@ One verified sequence was:
 ```text
 published case status: accepted
 owner comments /defer on the GitHub issue
-SignalForge stores decision: defer
+FeedbackMesh stores decision: defer
 case status becomes: triaging
 ```
 

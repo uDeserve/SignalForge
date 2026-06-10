@@ -4,7 +4,8 @@ This document describes the real hosted onboarding path that is currently usable
 
 Verified deployment on 2026-06-09:
 
-- base URL: `https://sf.launchhub.icu`
+- base URL: `https://feedbackmesh.launchhub.icu`
+- post-install landing page: `GET /setup`
 - health: `GET /health` -> `200`
 - setup status: `GET /setup/status` -> `200`
 - hosted session creation: `POST /setup/sessions` -> `201`
@@ -28,7 +29,7 @@ Use this path when:
 5. Only if auto-detection does not complete, call `POST /setup/sessions/:id/github-binding`
    and confirm the repo with the binding code.
 6. Patch the target app with:
-   - `VITE_SIGNALFORGE_ENDPOINT=https://sf.launchhub.icu`
+- `VITE_SIGNALFORGE_ENDPOINT=https://feedbackmesh.launchhub.icu`
    - `VITE_SIGNALFORGE_PROJECT_KEY=<projectKey>`
    - `VITE_SIGNALFORGE_APP_NAME=<appName>`
 7. Send the first submission to `POST /submissions` with `X-SignalForge-Project-Key`.
@@ -52,7 +53,7 @@ In the current recommended path, the agent should treat `wait_for_human_github_i
 
 ## What Is Already Proven
 
-The hosted flow at `sf.launchhub.icu` has already been exercised through:
+The hosted flow at `feedbackmesh.launchhub.icu` has already been exercised through:
 
 - session creation
 - binding confirmation

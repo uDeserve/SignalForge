@@ -172,6 +172,16 @@ For the current webhook service:
 
 If running locally, expose the listener through a tunnel before registering it with GitHub.
 
+## Recommended GitHub App Settings
+
+For the current hosted FeedbackMesh deployment, use:
+
+- Homepage URL: `https://github.com/uDeserve/FeedbackMesh`
+- Setup URL: `https://feedbackmesh.launchhub.icu/setup`
+- Webhook URL: `https://feedbackmesh.launchhub.icu/webhooks/github`
+
+The `Setup URL` should not be a placeholder. FeedbackMesh now serves a real post-install landing page at `/setup`, so the GitHub install redirect has a coherent next step for agent-first onboarding.
+
 ## What Is Already Implemented
 
 - GitHub App publisher interface
@@ -228,9 +238,11 @@ You can confirm this in GitHub App Recent Deliveries:
 For a deployed FeedbackMesh instance behind HTTPS, keep SSL verification enabled and point GitHub to:
 
 - Webhook URL: `https://your-domain.example/webhooks/github`
+- Setup URL: `https://your-domain.example/setup`
 
 FeedbackMesh expects:
 
 - `POST /webhooks/github`
 - `x-github-event`
 - `x-hub-signature-256`
+- `GET /setup`
