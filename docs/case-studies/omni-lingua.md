@@ -104,6 +104,9 @@ This dogfooding reference still has room to improve:
 - the Omni Lingua bridge is currently a project-local integration layer, not yet a full switch to the published `@feedbackmesh/adapter` path
 - a polished public demo flow for this exact integration has not been packaged yet
 - a public end-to-end narrative with screenshots or video is still pending
+- the GitHub App install -> first publish -> decision-sync loop still needs to be completed on the Omni Lingua repository itself
+
+See `docs/omni-lingua-agent-first-closure.md` for the exact closure checklist.
 
 ## Why We Are Publishing This Early
 

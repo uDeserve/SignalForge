@@ -119,6 +119,12 @@ After patching the target app:
 2. verify that FeedbackMesh creates or merges cases
 3. inspect `/cases` or the printed JSON payload for the created case
 
+Important:
+
+- `run_readerapp_feedback_sample.mjs` only proves local intake and triage shape
+- it does not prove the hosted GitHub App closure on the real example repository
+- use `docs/omni-lingua-agent-first-closure.md` for the real dogfooding checklist
+
 If GitHub App mode is being used:
 
 1. install the GitHub App into the target repository
@@ -146,6 +152,7 @@ The currently verified hosted deployment is:
 - endpoint: `https://feedbackmesh.launchhub.icu`
 - status: real session creation, binding confirmation, first publish, and republish idempotency validated on 2026-06-09
 - workflow doc: `docs/hosted-agent-first.md`
+- example-repo closure doc: `docs/omni-lingua-agent-first-closure.md`
 
 ## GitHub App Goal
 

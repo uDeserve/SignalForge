@@ -92,6 +92,7 @@ Trust signals:
 
 - [Live E2E Verification](./docs/live-e2e.md)
 - [Omni Lingua Case Study](./docs/case-studies/omni-lingua.md)
+- [Omni Lingua Agent-First Closure](./docs/omni-lingua-agent-first-closure.md)
 - [Reader Feedback Examples](./docs/case-studies/reader-feedback-to-case-examples.md)
 - [Quick Start](./docs/quick-start.md)
 - [Hosted Agent-First Flow](./docs/hosted-agent-first.md)
@@ -425,6 +426,7 @@ They need fast integration, a GitHub-native workflow, and a system that starts c
 
 - `docs/vision.md`
 - `docs/case-studies/omni-lingua.md`
+- `docs/omni-lingua-agent-first-closure.md`
 - `docs/case-studies/mobile-lookup-friction.md`
 - `docs/case-studies/backend-hang-user-pain.md`
 - `docs/case-studies/reader-feedback-to-case-examples.md`

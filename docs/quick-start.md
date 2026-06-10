@@ -130,6 +130,8 @@ Expected result:
 - cases are created or merged
 - the case inbox becomes reviewable through the API
 
+This still does not prove the real GitHub App closure on the example product repo. For that dogfooding proof, use `docs/omni-lingua-agent-first-closure.md`.
+
 ## Path B: GitHub App In Fast Mode
 
 Use this path when you want the mature bot workflow instead of personal-token issue publishing.
@@ -217,6 +219,8 @@ Expected result:
 - GitHub sends the webhook
 - FeedbackMesh updates case state
 - maintainers stay inside the normal repo workflow
+
+If the target is the flagship example product rather than a lab repo, use `docs/omni-lingua-agent-first-closure.md` as the stricter exit checklist.
 
 ## Recommended First Production Shape
 
